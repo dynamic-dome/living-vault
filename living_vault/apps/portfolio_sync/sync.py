@@ -80,6 +80,22 @@ def sync_cmd(vault: str, db: str, dry_run: bool) -> None:
     click.echo(f"done: {written} page(s) written")
 
 
+@cli.command("now")
+@click.option("--session-summary", required=True, type=click.Path())
+@click.option("--todos-dir", required=True, type=click.Path())
+@click.option("--dry-run", is_flag=True)
+def now_cmd(session_summary: str, todos_dir: str, dry_run: bool) -> None:
+    from living_vault.apps.portfolio_sync.now_page import build_now_page
+    text = build_now_page(Path(session_summary), Path(todos_dir))
+    target = resolve_target_dir() / "wiki-pages" / "now.md"
+    if dry_run:
+        click.echo(text)
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    click.echo(f"wrote {target}")
+
+
 def main() -> None:
     cli()
 
