@@ -35,6 +35,13 @@ app = FastAPI(title="séance")
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+@app.on_event("startup")
+def _ensure_schema() -> None:
+    """Ensure seance tables exist — covers the case where the db was created
+    before the seance feature shipped (db.initialize is idempotent)."""
+    db_mod.initialize(_db_path())
+
+
 class SummonReq(BaseModel):
     path: str
 
