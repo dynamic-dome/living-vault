@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+.vault-engine.db
+.vault-engine.db-journal
+.vault-engine.db-wal
+.vault-engine.db-shm
+*.log
+.DS_Store
+node_modules/

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "living-vault"
+version = "0.1.0"
+description = "Vault engine + 3 consumers (synesthesia, seance, living-portfolio)"
+requires-python = ">=3.11"
+dependencies = [
+  "python-frontmatter>=1.0",
+  "click>=8.1",
+  "fastmcp>=0.4",
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "watchdog>=4.0",
+  "numpy>=1.26",
+  "anthropic>=0.34",
+  "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+embeddings = [
+  "sentence-transformers>=2.7",
+  "sqlite-vec>=0.1.1",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "httpx>=0.27",
+]
+
+[project.scripts]
+living-vault-mcp = "living_vault.mcp_servers.vault_engine.server:main"
+synesthesia = "living_vault.apps.synesthesia.render:cli"
+portfolio-sync = "living_vault.apps.portfolio_sync.sync:cli"
+
+[tool.setuptools.packages.find]
+include = ["living_vault*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
