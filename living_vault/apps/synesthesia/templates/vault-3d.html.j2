@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title }}</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a0a0f; color:#cfe; font-family:'JetBrains Mono', monospace; overflow:hidden; }
+    #info { position:fixed; top:8px; left:8px; padding:6px 10px; background:rgba(0,0,0,.5); border-radius:4px; font-size:12px; }
+    #picked { position:fixed; bottom:8px; left:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:12px; max-width:60ch; white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <div id="info">{{ count }} pages · {{ edge_count }} links · drag to orbit · scroll to zoom</div>
+  <div id="picked"></div>
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+    const NODES = {{ nodes_json | safe }};
+    const EDGES = {{ edges_json | safe }};
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+    camera.position.set(70,70,70);
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    // light
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(50,80,50);
+    scene.add(dir);
+
+    // cluster colors
+    const palette = ["#7ad","#fa7","#7af","#af7","#fbf","#bff","#ffb","#fbb"];
+    const clusterColor = (c) => {
+      let h=0; for (const ch of c) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+      return palette[h % palette.length];
+    };
+
+    const nodeMeshes = [];
+    NODES.forEach((n) => {
+      const r = 0.8 + Math.log(1 + (n.degree || 0)) * 0.5;
+      const geom = new THREE.SphereGeometry(r, 16, 12);
+      const mat = new THREE.MeshStandardMaterial({ color: clusterColor(n.cluster) });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(n.x, n.y, n.z);
+      mesh.userData = n;
+      scene.add(mesh);
+      nodeMeshes.push(mesh);
+    });
+
+    const nodeIndex = Object.fromEntries(NODES.map((n,i) => [n.path, i]));
+    EDGES.forEach((e) => {
+      const a = NODES[nodeIndex[e.from]];
+      const b = NODES[nodeIndex[e.to]];
+      if (!a || !b) return;
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(a.x, a.y, a.z),
+        new THREE.Vector3(b.x, b.y, b.z),
+      ]);
+      const mat = new THREE.LineBasicMaterial({ color: 0x335577, transparent:true, opacity:0.4 });
+      scene.add(new THREE.Line(geom, mat));
+    });
+
+    // picking
+    const ray = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    addEventListener("mousemove", (ev) => {
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+    });
+
+    function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      ray.setFromCamera(mouse, camera);
+      const hits = ray.intersectObjects(nodeMeshes);
+      const pickedEl = document.getElementById("picked");
+      if (hits.length > 0) {
+        const n = hits[0].object.userData;
+        pickedEl.textContent = `${n.cluster}/${n.title}\n${n.path}\nlinks: ${n.degree}`;
+      } else {
+        pickedEl.textContent = "";
+      }
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
