@@ -26,3 +26,18 @@ def test_extract_wikilinks_dedup():
     body = "[[wiki/a]] and again [[wiki/a]]."
     links = extract_wikilinks(body)
     assert links.count(("wiki/a", None)) == 2  # not deduped at this level
+
+
+from living_vault.core.graph import resolve_target
+
+
+def test_resolve_target_strips_wiki_prefix():
+    assert resolve_target("wiki/concepts/note-a") == "concepts/note-a.md"
+
+
+def test_resolve_target_passes_md_extension_through():
+    assert resolve_target("wiki/concepts/note-a.md") == "concepts/note-a.md"
+
+
+def test_resolve_target_returns_none_for_non_wiki():
+    assert resolve_target("concepts/note-a") is None

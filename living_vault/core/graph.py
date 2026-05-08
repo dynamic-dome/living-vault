@@ -14,3 +14,17 @@ def extract_wikilinks(body: str) -> list[tuple[str, str | None]]:
         alias = m.group(2).strip() if m.group(2) else None
         out.append((target, alias))
     return out
+
+
+def resolve_target(target: str) -> str | None:
+    """Map a wikilink target like 'wiki/concepts/foo' to vault relpath 'concepts/foo.md'.
+
+    Wiki convention: vault root is ~/wiki/wiki/, but wikilinks include the leading 'wiki/'
+    segment because the vault is itself nested inside a 'wiki/' directory.
+    """
+    if not target.startswith("wiki/"):
+        return None
+    stripped = target[len("wiki/"):]
+    if not stripped.endswith(".md"):
+        stripped = stripped + ".md"
+    return stripped
