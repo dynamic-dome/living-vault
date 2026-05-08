@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title }} | galaxy</title>
+  <style>
+    html, body { margin:0; height:100%; background:#05050a; color:#cfe; font-family:'JetBrains Mono', monospace; overflow:hidden; }
+    #info { position:fixed; top:8px; left:8px; padding:6px 10px; background:rgba(0,0,0,.6); border-radius:4px; font-size:12px; z-index:10; }
+    #picked { position:fixed; bottom:8px; left:8px; padding:8px 12px; background:rgba(0,0,0,.7); border-radius:4px; font-size:12px; max-width:60ch; white-space:pre-wrap; z-index:10; pointer-events:none; }
+    #legend { position:fixed; top:8px; right:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:11px; line-height:1.5; z-index:10; max-width:200px; }
+    .swatch { display:inline-block; width:10px; height:10px; margin-right:6px; vertical-align:middle; border-radius:2px; }
+  </style>
+</head>
+<body>
+  <div id="info">{{ count }} pages | {{ edge_count }} links | galaxy mode | drag/scroll</div>
+  <div id="picked"></div>
+  <div id="legend"></div>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }}
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const NODES = {{ nodes_json | safe }};
+    const EDGES = {{ edges_json | safe }};
+
+    // 13-color palette (cluster -> color), distinct
+    const PALETTE = [
+      "#ff5470","#06d6a0","#ffd166","#118ab2","#ef476f",
+      "#8338ec","#ff006e","#3a86ff","#fb5607","#ffbe0b",
+      "#06ffa5","#a162e8","#fcaeae"
+    ];
+    const clusterMap = {};
+    function colorOf(cluster) {
+      if (!(cluster in clusterMap)) clusterMap[cluster] = PALETTE[Object.keys(clusterMap).length % PALETTE.length];
+      return clusterMap[cluster];
+    }
+    NODES.forEach(n => colorOf(n.cluster));  // populate map in stable order
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x05050a, 0.0035);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 8000);
+    camera.position.set(220, 220, 220);
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+    // Points: tiny glowing dots, faint edges, suited for many nodes
+    const positions = new Float32Array(NODES.length * 3);
+    const colors    = new Float32Array(NODES.length * 3);
+    const sizes     = new Float32Array(NODES.length);
+    NODES.forEach((n, i) => {
+      positions[i*3+0] = n.x; positions[i*3+1] = n.y; positions[i*3+2] = n.z;
+      const c = new THREE.Color(colorOf(n.cluster));
+      colors[i*3+0] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+      sizes[i] = 1.5 + Math.log(1 + (n.degree || 0)) * 0.9;
+    });
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+    geom.setAttribute("size",     new THREE.BufferAttribute(sizes, 1));
+
+    const sprite = new THREE.CanvasTexture(makeStarTexture());
+    function makeStarTexture(){
+      const c = document.createElement("canvas"); c.width=c.height=64;
+      const g = c.getContext("2d");
+      const grd = g.createRadialGradient(32,32,0,32,32,32);
+      grd.addColorStop(0,"rgba(255,255,255,1)");
+      grd.addColorStop(0.4,"rgba(255,255,255,0.45)");
+      grd.addColorStop(1,"rgba(255,255,255,0)");
+      g.fillStyle = grd; g.fillRect(0,0,64,64);
+      return c;
+    }
+    const pointMat = new THREE.ShaderMaterial({
+      uniforms: { map: { value: sprite } },
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        attribute float size;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform sampler2D map;
+        varying vec3 vColor;
+        void main() {
+          vec4 t = texture2D(map, gl_PointCoord);
+          gl_FragColor = vec4(vColor, 1.0) * t;
+        }`
+    });
+    const points = new THREE.Points(geom, pointMat);
+    scene.add(points);
+
+    // edges: very faint, additive blending so dense regions glow
+    const edgePositions = [];
+    const nodeIndex = Object.fromEntries(NODES.map((n,i)=>[n.path,i]));
+    EDGES.forEach(e => {
+      const a = NODES[nodeIndex[e.from]];
+      const b = NODES[nodeIndex[e.to]];
+      if (!a || !b) return;
+      edgePositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    });
+    const edgeGeom = new THREE.BufferGeometry();
+    edgeGeom.setAttribute("position", new THREE.Float32BufferAttribute(edgePositions, 3));
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: 0x6688cc, transparent: true, opacity: 0.06,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    scene.add(new THREE.LineSegments(edgeGeom, edgeMat));
+
+    // raycaster on points (size-aware)
+    const ray = new THREE.Raycaster();
+    ray.params.Points = { threshold: 4 };
+    const mouse = new THREE.Vector2();
+    addEventListener("mousemove", (ev) => {
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+    });
+
+    function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      ray.setFromCamera(mouse, camera);
+      const hits = ray.intersectObject(points);
+      const pickedEl = document.getElementById("picked");
+      if (hits.length > 0) {
+        const i = hits[0].index;
+        const n = NODES[i];
+        pickedEl.textContent = `${n.cluster}/${n.title}\n${n.path}\nlinks: ${n.degree}`;
+      } else {
+        pickedEl.textContent = "";
+      }
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    // legend
+    const legendEl = document.getElementById("legend");
+    Object.entries(clusterMap).slice(0, 14).forEach(([cluster, color]) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<span class="swatch" style="background:${color}"></span>${cluster}`;
+      legendEl.appendChild(div);
+    });
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

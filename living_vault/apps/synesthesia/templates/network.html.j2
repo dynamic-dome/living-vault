@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title }} | network</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a0a0f; color:#dde; font-family:'JetBrains Mono', monospace; overflow:hidden; }
+    #info { position:fixed; top:8px; left:8px; padding:6px 10px; background:rgba(0,0,0,.6); border-radius:4px; font-size:12px; z-index:10; }
+    #picked { position:fixed; bottom:8px; left:8px; padding:8px 12px; background:rgba(0,0,0,.7); border-radius:4px; font-size:12px; max-width:60ch; white-space:pre-wrap; z-index:10; pointer-events:none; }
+    #legend { position:fixed; top:8px; right:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:11px; line-height:1.5; z-index:10; max-width:200px; }
+    .swatch { display:inline-block; width:10px; height:10px; margin-right:6px; vertical-align:middle; border-radius:2px; }
+  </style>
+</head>
+<body>
+  <div id="info">{{ count }} pages | {{ edge_count }} links | network mode | drag/scroll | hover for highlight</div>
+  <div id="picked"></div>
+  <div id="legend"></div>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }}
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const NODES = {{ nodes_json | safe }};
+    const EDGES = {{ edges_json | safe }};
+
+    const PALETTE = [
+      "#e63946","#f4a261","#e9c46a","#2a9d8f","#264653",
+      "#a8dadc","#457b9d","#8338ec","#ff006e","#ffd166",
+      "#06d6a0","#118ab2","#073b4c"
+    ];
+    const clusterMap = {};
+    function colorOf(c) {
+      if (!(c in clusterMap)) clusterMap[c] = PALETTE[Object.keys(clusterMap).length % PALETTE.length];
+      return clusterMap[c];
+    }
+    NODES.forEach(n => colorOf(n.cluster));
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 8000);
+    camera.position.set(250, 200, 250);
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir.position.set(60,120,80); scene.add(dir);
+
+    const sharedGeom = new THREE.SphereGeometry(1, 12, 10);
+    const meshes = [];
+    NODES.forEach((n, i) => {
+      const r = 0.5 + Math.log(1 + (n.degree || 0)) * 0.35;
+      const mat = new THREE.MeshLambertMaterial({ color: colorOf(n.cluster) });
+      const mesh = new THREE.Mesh(sharedGeom, mat);
+      mesh.scale.setScalar(r);
+      mesh.position.set(n.x, n.y, n.z);
+      mesh.userData = { node: n, baseColor: new THREE.Color(colorOf(n.cluster)), index: i };
+      scene.add(mesh);
+      meshes.push(mesh);
+    });
+
+    // edges with vertex colors so we can dim/highlight per-edge
+    const edgePositions = [];
+    const nodeIndex = Object.fromEntries(NODES.map((n,i)=>[n.path,i]));
+    const edgeIndices = [];
+    EDGES.forEach(e => {
+      const ai = nodeIndex[e.from]; const bi = nodeIndex[e.to];
+      if (ai === undefined || bi === undefined) return;
+      const a = NODES[ai]; const b = NODES[bi];
+      edgePositions.push(a.x,a.y,a.z, b.x,b.y,b.z);
+      edgeIndices.push([ai, bi]);
+    });
+    const edgeGeom = new THREE.BufferGeometry();
+    edgeGeom.setAttribute("position", new THREE.Float32BufferAttribute(edgePositions, 3));
+    const edgeColors = new Float32Array(edgePositions.length);
+    edgeGeom.setAttribute("color", new THREE.BufferAttribute(edgeColors, 3));
+    const BASE_R=0.35, BASE_G=0.45, BASE_B=0.7, BASE_O=0.12;
+    function paintAllEdgesBase() {
+      for (let i=0; i<edgeColors.length; i+=3) {
+        edgeColors[i]=BASE_R*BASE_O; edgeColors[i+1]=BASE_G*BASE_O; edgeColors[i+2]=BASE_B*BASE_O;
+      }
+      edgeGeom.attributes.color.needsUpdate = true;
+    }
+    paintAllEdgesBase();
+    const edgeMat = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 1.0, depthWrite: false,
+    });
+    scene.add(new THREE.LineSegments(edgeGeom, edgeMat));
+
+    const adjacency = NODES.map(()=>[]);
+    edgeIndices.forEach(([a,b], ei) => { adjacency[a].push(ei); adjacency[b].push(ei); });
+
+    const ray = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    addEventListener("mousemove", (ev) => {
+      mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+    });
+    let lastHoverIdx = -1;
+
+    function applyHover(idx) {
+      meshes.forEach((m, i) => {
+        const base = m.userData.baseColor;
+        if (idx < 0) m.material.color.copy(base);
+        else if (i === idx) m.material.color.copy(base);
+        else m.material.color.copy(base.clone().multiplyScalar(0.25));
+      });
+      if (idx >= 0) {
+        adjacency[idx].forEach(ei => {
+          const [a,b] = edgeIndices[ei];
+          const other = a === idx ? b : a;
+          meshes[other].material.color.copy(meshes[other].userData.baseColor);
+        });
+      }
+      // edges
+      const HOT_R=1.0, HOT_G=0.85, HOT_B=0.4, HOT_O=0.95;
+      for (let i=0; i<edgeColors.length; i+=3) {
+        edgeColors[i]=BASE_R*0.04; edgeColors[i+1]=BASE_G*0.04; edgeColors[i+2]=BASE_B*0.04;
+      }
+      if (idx >= 0) {
+        adjacency[idx].forEach(ei => {
+          const off = ei * 6;
+          for (let k=0; k<2; k++) {
+            edgeColors[off+k*3+0] = HOT_R*HOT_O;
+            edgeColors[off+k*3+1] = HOT_G*HOT_O;
+            edgeColors[off+k*3+2] = HOT_B*HOT_O;
+          }
+        });
+      } else {
+        paintAllEdgesBase();
+        return;
+      }
+      edgeGeom.attributes.color.needsUpdate = true;
+    }
+
+    function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      ray.setFromCamera(mouse, camera);
+      const hits = ray.intersectObjects(meshes, false);
+      const pickedEl = document.getElementById("picked");
+      let idx = -1;
+      if (hits.length > 0) {
+        idx = hits[0].object.userData.index;
+        const n = hits[0].object.userData.node;
+        pickedEl.textContent = `${n.cluster}/${n.title}\n${n.path}\nlinks: ${n.degree}`;
+      } else {
+        pickedEl.textContent = "";
+      }
+      if (idx !== lastHoverIdx) {
+        applyHover(idx);
+        lastHoverIdx = idx;
+      }
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    const legendEl = document.getElementById("legend");
+    Object.entries(clusterMap).slice(0, 14).forEach(([c, color]) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<span class="swatch" style="background:${color}"></span>${c}`;
+      legendEl.appendChild(div);
+    });
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

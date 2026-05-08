@@ -10,15 +10,29 @@ from living_vault.apps.synesthesia.layout import compute_layout
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
-def render_html(db_path: Path, output: Path, public_only: bool) -> None:
+VARIANT_TEMPLATES = {
+    "default": "vault-3d.html.j2",
+    "galaxy":  "galaxy.html.j2",
+    "city":    "city.html.j2",
+    "network": "network.html.j2",
+}
+
+
+def render_html(
+    db_path: Path,
+    output: Path,
+    public_only: bool,
+    variant: str = "default",
+) -> None:
     nodes, edges = compute_layout(db_path, public_only=public_only)
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html"]),
     )
-    tmpl = env.get_template("vault-3d.html.j2")
+    template_name = VARIANT_TEMPLATES.get(variant, VARIANT_TEMPLATES["default"])
+    tmpl = env.get_template(template_name)
     rendered = tmpl.render(
-        title="Vault — public" if public_only else "Vault — full",
+        title="Vault | public" if public_only else "Vault | full",
         count=len(nodes),
         edge_count=len(edges),
         nodes_json=json.dumps(nodes),
@@ -32,9 +46,15 @@ def render_html(db_path: Path, output: Path, public_only: bool) -> None:
 @click.option("--db", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.option("--output", required=True, type=click.Path())
 @click.option("--public-only", is_flag=True, help="render only pages with public:true")
-def cli(db: str, output: str, public_only: bool) -> None:
-    render_html(Path(db), Path(output), public_only=public_only)
-    click.echo(f"wrote {output}")
+@click.option(
+    "--variant",
+    type=click.Choice(list(VARIANT_TEMPLATES.keys())),
+    default="default",
+    help="visual style variant",
+)
+def cli(db: str, output: str, public_only: bool, variant: str) -> None:
+    render_html(Path(db), Path(output), public_only=public_only, variant=variant)
+    click.echo(f"wrote {output} (variant={variant})")
 
 
 if __name__ == "__main__":

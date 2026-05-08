@@ -18,18 +18,21 @@ import numpy as np
 from living_vault.core import db as db_mod
 
 
-def _pca_3d(matrix: np.ndarray) -> np.ndarray:
-    """Reduce N-dim matrix to 3 dims via PCA (centered)."""
+def _pca_3d(matrix: np.ndarray, scale: float = 100.0) -> np.ndarray:
+    """Reduce N-dim matrix to 3 dims via PCA (centered).
+
+    scale: target half-extent of the projected cube. Default 100.0 spreads
+    ~1000 nodes over 200 units per axis, leaving room for sphere radii.
+    Tests use scale=25 implicitly via wider PCA but accept any scale.
+    """
     if matrix.shape[0] <= 1:
         return np.zeros((matrix.shape[0], 3), dtype=np.float32)
     centered = matrix - matrix.mean(axis=0, keepdims=True)
-    # SVD for numerical stability on small N
     u, s, vh = np.linalg.svd(centered, full_matrices=False)
-    components = vh[:3]  # (3, dim)
-    proj = centered @ components.T  # (N, 3)
-    # scale to roughly [-25, 25]
+    components = vh[:3]
+    proj = centered @ components.T
     max_abs = float(np.abs(proj).max() or 1.0)
-    return (proj / max_abs * 25.0).astype(np.float32)
+    return (proj / max_abs * scale).astype(np.float32)
 
 
 def compute_layout(
