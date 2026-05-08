@@ -28,3 +28,24 @@ def resolve_target(target: str) -> str | None:
     if not stripped.endswith(".md"):
         stripped = stripped + ".md"
     return stripped
+
+
+import sqlite3
+
+
+def neighbors(con: sqlite3.Connection, path: str) -> list[str]:
+    """Outgoing edges: pages that path links to."""
+    rows = con.execute(
+        "SELECT DISTINCT to_path FROM links WHERE from_path = ? ORDER BY to_path",
+        (path,),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def backlinks(con: sqlite3.Connection, path: str) -> list[str]:
+    """Incoming edges: pages that link to path."""
+    rows = con.execute(
+        "SELECT DISTINCT from_path FROM links WHERE to_path = ? ORDER BY from_path",
+        (path,),
+    ).fetchall()
+    return [r[0] for r in rows]

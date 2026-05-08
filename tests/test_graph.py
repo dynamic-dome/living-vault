@@ -41,3 +41,39 @@ def test_resolve_target_passes_md_extension_through():
 
 def test_resolve_target_returns_none_for_non_wiki():
     assert resolve_target("concepts/note-a") is None
+
+
+import sqlite3
+from pathlib import Path
+from living_vault.core import db as db_mod
+from living_vault.core.indexer import index_vault
+from living_vault.core.graph import neighbors, backlinks
+
+
+def test_neighbors_returns_outgoing(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    con = db_mod.connect(db_path)
+    n = neighbors(con, "concepts/note-a.md")
+    con.close()
+    assert "concepts/note-b.md" in n
+    assert "synthesis/syn-1.md" in n
+
+
+def test_backlinks_returns_incoming(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    con = db_mod.connect(db_path)
+    b = backlinks(con, "concepts/note-a.md")
+    con.close()
+    assert "concepts/note-b.md" in b
+    assert "synthesis/syn-1.md" in b
+
+
+def test_neighbors_empty_for_leaf(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    con = db_mod.connect(db_path)
+    n = neighbors(con, "does-not-exist.md")
+    con.close()
+    assert n == []
