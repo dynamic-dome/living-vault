@@ -1,0 +1,2 @@
+exit=0
+# st OK shape=(1, 384), vec OK — both sentence-transformers and sqlite-vec work on Windows
