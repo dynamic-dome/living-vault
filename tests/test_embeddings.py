@@ -28,3 +28,42 @@ def test_get_backend_returns_some_backend():
     b = get_backend()
     assert b is not None
     assert b.dim > 0
+
+
+import sqlite3
+from pathlib import Path
+
+from living_vault.core import db as db_mod
+from living_vault.core.indexer import index_vault
+from living_vault.core.embeddings import index_embeddings, similar
+
+
+def test_index_embeddings_persists_all(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    n = index_embeddings(vault_copy, db_path)
+    assert n == 3
+    con = sqlite3.connect(str(db_path))
+    cnt = con.execute("SELECT COUNT(*) FROM embeddings_blob").fetchone()[0]
+    con.close()
+    assert cnt == 3
+
+
+def test_similar_returns_self_first(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    con = db_mod.connect(db_path)
+    res = similar(con, "concepts/note-a.md", k=3)
+    con.close()
+    assert res[0][0] == "concepts/note-a.md"
+    assert abs(res[0][1] - 1.0) < 1e-3
+
+
+def test_index_embeddings_skip_unchanged(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    n1 = index_embeddings(vault_copy, db_path)
+    n2 = index_embeddings(vault_copy, db_path)  # second pass: no changes
+    assert n1 == 3
+    assert n2 == 0
