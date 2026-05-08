@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>séance</title>
+  <style>
+    html,body{margin:0;height:100%;background:#0a0a0f;color:#cfe;font-family:'JetBrains Mono',monospace;}
+    #wrap{display:grid;grid-template-columns:280px 1fr;height:100vh;}
+    #pages{border-right:1px solid #234;overflow:auto;padding:8px;font-size:12px;}
+    .pageItem{padding:6px 8px;cursor:pointer;border-radius:3px;}
+    .pageItem:hover{background:#1a1f2e;}
+    #chat{display:flex;flex-direction:column;padding:12px;}
+    #log{flex:1;overflow:auto;font-size:13px;line-height:1.5;}
+    .msg{margin:8px 0;padding:8px 10px;border-radius:6px;}
+    .msg.user{background:#13202c;}
+    .msg.assistant{background:#1a2e1c;}
+    #form{display:flex;gap:8px;}
+    #txt{flex:1;background:#13202c;border:1px solid #234;color:#cfe;padding:8px;border-radius:4px;font-family:inherit;}
+    button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;}
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="pages"><div style="opacity:.6;font-size:11px;">loading…</div></div>
+  <div id="chat">
+    <div id="who" style="opacity:.7;font-size:12px;margin-bottom:8px;">no page summoned yet</div>
+    <div id="log"></div>
+    <form id="form"><input id="txt" autocomplete="off" placeholder="speak to the page…" disabled /><button id="send" disabled>say</button></form>
+  </div>
+</div>
+<script>
+let sid = null;
+async function loadPages(){
+  const r = await fetch("/api/pages"); const j = await r.json();
+  const el = document.getElementById("pages"); el.innerHTML = "";
+  j.forEach(p => {
+    const d = document.createElement("div"); d.className="pageItem";
+    d.textContent = p.path;
+    d.onclick = () => summon(p.path);
+    el.appendChild(d);
+  });
+}
+async function summon(path){
+  const r = await fetch("/api/summon",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path})});
+  if(!r.ok){ alert("summon failed"); return; }
+  const j = await r.json(); sid = j.session_id;
+  document.getElementById("who").textContent = "speaking with: "+path+" — era "+(j.persona.era_marker||"unknown");
+  document.getElementById("log").innerHTML = "";
+  document.getElementById("txt").disabled = false;
+  document.getElementById("send").disabled = false;
+  document.getElementById("txt").focus();
+}
+document.getElementById("form").onsubmit = async (ev) => {
+  ev.preventDefault();
+  if(sid===null) return;
+  const txt = document.getElementById("txt");
+  const userText = txt.value.trim(); if(!userText) return;
+  txt.value="";
+  appendMsg("user", userText);
+  const r = await fetch("/api/say",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sid,text:userText})});
+  const j = await r.json();
+  appendMsg("assistant", j.reply || "(no reply)");
+};
+function appendMsg(role, text){
+  const log = document.getElementById("log");
+  const d = document.createElement("div"); d.className="msg "+role; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+loadPages();
+</script>
+</body>
+</html>
