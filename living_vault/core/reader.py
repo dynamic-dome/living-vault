@@ -40,3 +40,16 @@ def read_page(file_path: Path, vault_root: Path) -> Page:
         is_public=is_public,
         content_hash_value=content_hash(raw),
     )
+
+
+from collections.abc import Iterator
+
+
+def walk_vault(vault_root: Path) -> Iterator[Page]:
+    """Yield Page for every .md file under vault_root, skipping dotted dirs/files."""
+    vault_root = vault_root.resolve()
+    for path in vault_root.rglob("*.md"):
+        rel = path.relative_to(vault_root)
+        if any(part.startswith(".") for part in rel.parts):
+            continue
+        yield read_page(path, vault_root)

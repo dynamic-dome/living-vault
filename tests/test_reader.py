@@ -31,3 +31,29 @@ def test_content_hash_stable():
     assert h1 == h2
     assert h1 != content_hash("hello world ")
     assert len(h1) == 64  # sha256 hex
+
+
+from living_vault.core.reader import walk_vault
+
+
+def test_walk_vault_finds_all_md_files(fixture_vault_root):
+    pages = list(walk_vault(fixture_vault_root))
+    relpaths = sorted(p.relpath for p in pages)
+    assert relpaths == [
+        "concepts/note-a.md",
+        "concepts/note-b.md",
+        "synthesis/syn-1.md",
+    ]
+
+
+def test_walk_vault_skips_hidden(tmp_path, fixture_vault_root):
+    import shutil
+    dst = tmp_path / "vault"
+    shutil.copytree(fixture_vault_root, dst)
+    (dst / ".hidden.md").write_text("---\n---\nhidden\n", encoding="utf-8")
+    (dst / ".obsidian").mkdir()
+    (dst / ".obsidian" / "config.md").write_text("---\n---\nx\n", encoding="utf-8")
+    pages = list(walk_vault(dst))
+    paths = {p.relpath for p in pages}
+    assert ".hidden.md" not in paths
+    assert all(not pp.startswith(".obsidian/") for pp in paths)
