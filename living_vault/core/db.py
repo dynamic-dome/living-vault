@@ -53,6 +53,22 @@ CREATE TABLE IF NOT EXISTS embeddings_blob (
     dim      INTEGER NOT NULL,
     vector   BLOB NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS seance_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_path   TEXT NOT NULL,
+    started_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_seance_page ON seance_sessions(page_path);
+
+CREATE TABLE IF NOT EXISTS seance_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL REFERENCES seance_sessions(id),
+    role        TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_seance_msgs_session ON seance_messages(session_id);
 """
 
 
