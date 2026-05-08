@@ -1,0 +1,34 @@
+Bench: real ~/wiki/wiki/ vault, 953 pages.
+Date: 2026-05-08
+Hardware: User's Windows 11 desktop, no GPU acceleration for embeddings.
+
+Results
+-------
+ELAPSED: 103.45 seconds (well below 600s acceptance criterion)
+
+Per-stage:
+- Indexing (file walk + frontmatter parse + wikilink extract + DB upsert): finished as part of the run
+- Embedding (sentence-transformers all-MiniLM-L6-v2 on 953 pages): dominates the runtime
+
+DB sanity:
+- pages = 953
+- links = 5978   (~6.27 outgoing links per page on average)
+- emb   = 953
+- public = 0     (no public:true frontmatter set yet — expected)
+
+Smoke queries on real data:
+- "living vault project" -> overview.md (0.567), vault-design-fuer-ai-agenten.md (0.445)
+- "cv bewerbung lebenslauf" -> cv-variantenvergleich.md (0.540)
+- "mcp protocol" -> concepts/mcp-server.md (0.605), concepts/model-context-protocol.md (0.557)
+- similar(overview.md) recovers obvious neighbors: lint/, vault-design pages
+- neighbors(overview.md) lists 10 actually-linked dashboards/entities
+
+Conclusion
+----------
+Phase-1 acceptance criterion met: real-vault indexing in ~1.7 minutes (target <=10 min).
+Re-runs will be fast due to content-hash skip-unchanged in the indexer; only changed
+pages will trigger re-embedding.
+
+No need to switch off sentence-transformers.
+No need for sqlite-vec virtual tables — BLOB column with numpy.dot is fast enough at
+953 pages. (Will revisit only if vault grows to 5-10k pages.)
