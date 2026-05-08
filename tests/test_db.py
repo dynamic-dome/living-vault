@@ -29,5 +29,6 @@ def test_initialize_is_idempotent(db_path: Path):
 def test_connect_returns_open_connection(db_path: Path):
     db_mod.initialize(db_path)
     con = db_mod.connect(db_path)
-    assert con.execute("SELECT 1").fetchone() == (1,)
+    row = con.execute("SELECT 1").fetchone()
+    assert tuple(row) == (1,)
     con.close()

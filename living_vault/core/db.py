@@ -68,4 +68,5 @@ def initialize(db_path: Path) -> None:
 
 def connect(db_path: Path) -> sqlite3.Connection:
     con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
     return con
