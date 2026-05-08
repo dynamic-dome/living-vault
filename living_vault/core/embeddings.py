@@ -154,3 +154,21 @@ def similar(
         scored.append((r[0], float(np.dot(q, v))))
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:k]
+
+
+def search_semantic(
+    con: sqlite3.Connection, query: str, k: int = 10
+) -> list[tuple[str, float]]:
+    """Encode `query` and return top-k pages by cosine similarity."""
+    backend = get_backend()
+    q = backend.encode([query])[0]
+    rows = con.execute(
+        "SELECT path, model, dim, vector FROM embeddings_blob WHERE model = ?",
+        (backend.name,),
+    ).fetchall()
+    scored: list[tuple[str, float]] = []
+    for r in rows:
+        v = _blob_to_vec(r[3], r[2])
+        scored.append((r[0], float(np.dot(q, v))))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored[:k]

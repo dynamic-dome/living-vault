@@ -67,3 +67,18 @@ def test_index_embeddings_skip_unchanged(vault_copy: Path, db_path: Path):
     n2 = index_embeddings(vault_copy, db_path)  # second pass: no changes
     assert n1 == 3
     assert n2 == 0
+
+
+from living_vault.core.embeddings import search_semantic
+
+
+def test_search_semantic_returns_results(vault_copy: Path, db_path: Path):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    con = db_mod.connect(db_path)
+    res = search_semantic(con, "alpha topics", k=3)
+    con.close()
+    assert len(res) == 3
+    paths = [p for p, _ in res]
+    assert "concepts/note-a.md" in paths  # note-a mentions "alpha"
