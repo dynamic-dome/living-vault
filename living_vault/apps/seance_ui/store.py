@@ -53,8 +53,44 @@ def list_sessions(db_path: Path) -> list[dict]:
     con = db_mod.connect(db_path)
     try:
         rows = con.execute(
-            "SELECT id, page_path, started_at FROM seance_sessions ORDER BY id DESC"
+            """
+            SELECT s.id, s.page_path, s.started_at,
+                   COUNT(m.id) AS message_count,
+                   MAX(m.created_at) AS last_message_at
+            FROM seance_sessions s
+            LEFT JOIN seance_messages m ON m.session_id = s.id
+            GROUP BY s.id
+            ORDER BY s.id DESC
+            """
         ).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        con.close()
+
+
+def get_session_detail(db_path: Path, session_id: int) -> dict | None:
+    """Return {id, page_path, started_at, messages: [{role, content}, ...]} or None."""
+    con = db_mod.connect(db_path)
+    try:
+        row = con.execute(
+            "SELECT id, page_path, started_at FROM seance_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        msg_rows = con.execute(
+            "SELECT role, content, created_at FROM seance_messages "
+            "WHERE session_id = ? ORDER BY id",
+            (session_id,),
+        ).fetchall()
+        return {
+            "id": row["id"],
+            "page_path": row["page_path"],
+            "started_at": row["started_at"],
+            "messages": [
+                {"role": r["role"], "content": r["content"]}
+                for r in msg_rows
+            ],
+        }
     finally:
         con.close()

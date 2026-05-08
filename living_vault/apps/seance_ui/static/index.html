@@ -5,34 +5,67 @@
   <title>séance</title>
   <style>
     html,body{margin:0;height:100%;background:#0a0a0f;color:#cfe;font-family:'JetBrains Mono',monospace;}
-    #wrap{display:grid;grid-template-columns:280px 1fr;height:100vh;}
-    #pages{border-right:1px solid #234;overflow:auto;padding:8px;font-size:12px;}
+    #wrap{display:grid;grid-template-columns:320px 1fr;height:100vh;}
+    #side{border-right:1px solid #234;display:flex;flex-direction:column;}
+    #tabs{display:flex;border-bottom:1px solid #234;}
+    .tab{flex:1;padding:8px;text-align:center;cursor:pointer;font-size:12px;background:#13202c;border-right:1px solid #234;}
+    .tab:last-child{border-right:none;}
+    .tab.active{background:#1a2e1c;color:#cfe;font-weight:bold;}
+    #list{flex:1;overflow:auto;padding:8px;font-size:12px;}
     .pageItem{padding:6px 8px;cursor:pointer;border-radius:3px;}
     .pageItem:hover{background:#1a1f2e;}
+    .sessionItem{padding:8px 10px;cursor:pointer;border-radius:3px;border:1px solid #234;margin-bottom:6px;background:#0f1620;}
+    .sessionItem:hover{background:#1a2532;}
+    .sessionMeta{font-size:10px;opacity:.65;margin-top:2px;}
     #chat{display:flex;flex-direction:column;padding:12px;}
+    #header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+    #who{opacity:.85;font-size:12px;}
+    #exportBtn{background:#235;color:#cfe;border:1px solid #347;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
+    #exportBtn:disabled{opacity:.4;cursor:not-allowed;}
     #log{flex:1;overflow:auto;font-size:13px;line-height:1.5;}
     .msg{margin:8px 0;padding:8px 10px;border-radius:6px;}
     .msg.user{background:#13202c;}
     .msg.assistant{background:#1a2e1c;}
     #form{display:flex;gap:8px;}
     #txt{flex:1;background:#13202c;border:1px solid #234;color:#cfe;padding:8px;border-radius:4px;font-family:inherit;}
-    button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;}
+    button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;font-family:inherit;}
+    button:disabled{opacity:.4;cursor:not-allowed;}
+    #toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;background:#1a3a1c;border:1px solid #4a8;border-radius:6px;font-size:12px;display:none;z-index:50;max-width:60ch;}
   </style>
 </head>
 <body>
 <div id="wrap">
-  <div id="pages"><div style="opacity:.6;font-size:11px;">loading…</div></div>
+  <div id="side">
+    <div id="tabs">
+      <div class="tab active" data-tab="pages" onclick="switchTab('pages')">pages</div>
+      <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">past sessions</div>
+    </div>
+    <div id="list"><div style="opacity:.6;font-size:11px;">loading…</div></div>
+  </div>
   <div id="chat">
-    <div id="who" style="opacity:.7;font-size:12px;margin-bottom:8px;">no page summoned yet</div>
+    <div id="header">
+      <div id="who">no page summoned yet</div>
+      <button id="exportBtn" disabled onclick="exportSession()">export to wiki</button>
+    </div>
     <div id="log"></div>
     <form id="form"><input id="txt" autocomplete="off" placeholder="speak to the page…" disabled /><button id="send" disabled>say</button></form>
   </div>
 </div>
+<div id="toast"></div>
 <script>
 let sid = null;
+let currentTab = "pages";
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  if (name === "pages") loadPages();
+  else loadSessions();
+}
+
 async function loadPages(){
   const r = await fetch("/api/pages"); const j = await r.json();
-  const el = document.getElementById("pages"); el.innerHTML = "";
+  const el = document.getElementById("list"); el.innerHTML = "";
   j.forEach(p => {
     const d = document.createElement("div"); d.className="pageItem";
     d.textContent = p.path;
@@ -40,16 +73,69 @@ async function loadPages(){
     el.appendChild(d);
   });
 }
+
+async function loadSessions(){
+  const r = await fetch("/api/sessions"); const j = await r.json();
+  const el = document.getElementById("list"); el.innerHTML = "";
+  if (j.length === 0) {
+    el.innerHTML = '<div style="opacity:.5;padding:8px;font-size:11px;">no sessions yet — pick a page and start talking</div>';
+    return;
+  }
+  j.forEach(s => {
+    const d = document.createElement("div"); d.className="sessionItem";
+    const date = (s.started_at || "").substring(0, 16).replace("T", " ");
+    d.innerHTML = `<div>${s.page_path}</div><div class="sessionMeta">${date} | ${s.message_count} msgs</div>`;
+    d.onclick = () => loadSessionIntoChat(s.id, s.page_path);
+    el.appendChild(d);
+  });
+}
+
+async function loadSessionIntoChat(sessionId, pagePath){
+  const r = await fetch(`/api/sessions/${sessionId}`);
+  if (!r.ok) { toast("could not load session"); return; }
+  const j = await r.json();
+  sid = sessionId;
+  document.getElementById("who").textContent = "viewing past session: " + pagePath;
+  document.getElementById("log").innerHTML = "";
+  j.messages.forEach(m => appendMsg(m.role, m.content));
+  document.getElementById("txt").disabled = false;
+  document.getElementById("send").disabled = false;
+  document.getElementById("exportBtn").disabled = false;
+}
+
 async function summon(path){
   const r = await fetch("/api/summon",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path})});
-  if(!r.ok){ alert("summon failed"); return; }
+  if(!r.ok){ toast("summon failed: " + path); return; }
   const j = await r.json(); sid = j.session_id;
   document.getElementById("who").textContent = "speaking with: "+path+" — era "+(j.persona.era_marker||"unknown");
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
+  document.getElementById("exportBtn").disabled = false;
   document.getElementById("txt").focus();
 }
+
+async function exportSession(){
+  if (sid === null) return;
+  const btn = document.getElementById("exportBtn");
+  btn.disabled = true; btn.textContent = "exporting…";
+  try {
+    const r = await fetch(`/api/sessions/${sid}/export`, {method: "POST"});
+    if (!r.ok) { toast("export failed"); return; }
+    const j = await r.json();
+    toast("exported to: " + j.exported_to);
+  } finally {
+    btn.disabled = false; btn.textContent = "export to wiki";
+  }
+}
+
+function toast(text){
+  const t = document.getElementById("toast");
+  t.textContent = text;
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 4000);
+}
+
 document.getElementById("form").onsubmit = async (ev) => {
   ev.preventDefault();
   if(sid===null) return;
@@ -61,11 +147,13 @@ document.getElementById("form").onsubmit = async (ev) => {
   const j = await r.json();
   appendMsg("assistant", j.reply || "(no reply)");
 };
+
 function appendMsg(role, text){
   const log = document.getElementById("log");
   const d = document.createElement("div"); d.className="msg "+role; d.textContent = text;
   log.appendChild(d); log.scrollTop = log.scrollHeight;
 }
+
 loadPages();
 </script>
 </body>
