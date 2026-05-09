@@ -7,7 +7,9 @@ compatibility with Phase-1 imports.
 """
 from __future__ import annotations
 import os
-from typing import Protocol
+from typing import Callable, Protocol
+
+ToolHandler = Callable[[str, dict], "str | dict"]
 
 
 class LLM(Protocol):
@@ -51,7 +53,7 @@ class FakeLLMWithTools:
         system: str,
         history: list[tuple[str, str]],
         tools: list[dict],
-        tool_handler,
+        tool_handler: ToolHandler,
         max_iterations: int = 5,
     ) -> str:
         iters = 0
@@ -94,7 +96,7 @@ class AnthropicLLM:
         system: str,
         history: list[tuple[str, str]],
         tools: list[dict],
-        tool_handler,
+        tool_handler: ToolHandler,
         max_iterations: int = 5,
     ) -> str:
         """Multi-turn Anthropic loop. Calls tool_handler(name, input) on each tool_use

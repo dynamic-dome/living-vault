@@ -61,16 +61,18 @@ def test_handler_receives_name_and_args():
 
 def test_max_iterations_caps_loop():
     """If the script keeps emitting tool_use beyond max_iterations, the helper
-    must terminate and return the forced-final fallback text."""
+    must terminate at exactly max_iterations calls and return the budget-
+    exhausted fallback string (distinct from script-exhausted)."""
     script = [{"type": "tool_use", "name": "consult_neighbor", "input": {"neighbor_path": f"p{i}.md"}}
               for i in range(10)]  # ten tool_use steps, no terminating text
     llm = FakeLLMWithTools(script)
     out = llm.respond_with_tools(
         system="s", history=[], tools=[], tool_handler=_noop_handler, max_iterations=3
     )
-    # forced final fallback must produce a string, not raise
-    assert isinstance(out, str)
-    assert len(llm.tool_calls_made) <= 3
+    # exactly 3 calls fire (cap honored, not approximate), and the fallback
+    # string is the budget-exhausted one, not the script-exhausted one.
+    assert len(llm.tool_calls_made) == 3
+    assert out == "(consultation budget exhausted — forced final)"
 
 
 def test_handler_is_error_passes_through():
