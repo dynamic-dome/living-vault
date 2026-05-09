@@ -28,3 +28,64 @@ Sichtprüfung mit echter Anthropic Haiku 4.5: 5 Pages distilliert, User-Verdikt 
 ### Errors
 
 (keine — alle Code-Quality-Findings wurden im normalen Cross-Review-Loop als Follow-ups adressiert, nicht als Bug-Fixes auf production-state)
+
+
+## Iteration #2 — 2026-05-09 12:00
+
+**Type:** feature
+**Summary:** Phase 10a (consult_neighbor / Pull-on-Demand-Tool) komplett implementiert mit subagent-driven TDD-Workflow inkl. Live-Sichtprüfungs-Hotfix
+**Files changed:** living_vault/core/db.py, living_vault/core/llm.py (respond_with_tools + FakeLLMWithTools), living_vault/apps/seance_ui/neighbors.py (NEU), living_vault/apps/seance_ui/store.py (add_tool_event + history filter + persona_path), living_vault/apps/seance_ui/app.py (say wired through respond_with_tools), living_vault/apps/seance_ui/static/index.html (mini-bubbles), living_vault/apps/seance_ui/prompt.py (Hotfix: full neighbor paths in system prompt), tests/test_db_migration.py, tests/test_seance_store.py, tests/test_core_llm_tools.py (NEU), tests/test_seance_neighbors.py (NEU), tests/test_seance_say_with_tools.py (NEU), tests/test_seance_app.py, tests/test_seance_prompt.py
+**Tests:** passed (156 passed, war 118 vor Phase 10a, +38)
+**Confidence:** 5/5
+**Tags:** python, fastapi, anthropic, tool-use, mcp-tooling, llm-loop, schema-migration, tdd, subagent-driven, live-smoke, hotfix, ui
+
+### Details
+
+Master-Plan-Row 10 in 10a (Stufe 2 = Pull-on-Demand) und 10b (Stufe 3 = Multi-Persona-Roundtable) aufgeteilt. Phase 10a komplett: 8 Tasks via subagent-driven-development mit fresh subagent + 2-stage-Review pro Task. 16 Commits gesamt (8 Implementation + 6 Quality-Tightening + 1 Hotfix + 1 Closing). Architektur: respond_with_tools-Loop in core/llm.py mit max_iterations=5 Forced-Final-Call-Fallback, consult_neighbor-Handler-Closure mit Allowlist (graph_neighbors) + Soft-Cap (10 Calls/Turn) + Arg-Validation. UI-Mini-Bubbles "» consulted [[X]] (N chars)" italic mit grünem Border. seance_messages.persona_path nullable Spalte (vorbereitend für Phase 10b).
+
+Live-Sichtprüfung 1. Versuch: Persona riet "sources/mcp-oekosystem/index.md" als Nachbar-Pfad (ihren eigenen Pfad-Stamm) statt der echten "concepts/..." Pfade. Persona diagnostizierte den Bug sogar selbst im Output. Hotfix `90120ea`: System-Prompt zeigt jetzt vollständige Nachbar-Pfade als "title -> `relpath`" plus expliziten Block "Calling consult_neighbor" der die LLM instruiert, den EXAKTEN relpath aus der Liste zu übergeben. 2. Versuch: 5 Nachbarn erfolgreich consultiert, Antwort inhaltlich angereichert ("Siemens Hannover Messe", "irreversibel"-Pattern, "stille Revolution"). User-Verdikt: positiv ("nice!!").
+
+### Learnings
+
+- **System-Prompt MUSS Nachbar-Pfade als vollständige relpaths enthalten, nicht nur Title-Stems**: Die LLM kann sonst den Tool-Call-String nicht korrekt bilden und scheitert konsequent am Allowlist-Check. Der Hotfix ist die wichtigste Erkenntnis für künftige Tool-Use-Designs in diesem Projekt: was die LLM als Tool-Argument übergeben soll, MUSS sie verbatim in ihrem Kontext sehen, nicht nur als "title das du transformieren musst".
+- **Persona-eigene Diagnose des Bugs ist ein Signal für gutes Design**: Statt einfach zu halluzinieren hat die Persona im Output reflektiert "vielleicht `wiki/` statt `sources/`?" — das spricht dafür dass der Anti-Hallucination-Block im System-Prompt funktioniert (sie ratet nicht silently, sondern macht ihre Unsicherheit explizit).
+- **Subagent-driven-development hält auch bei 8 Tasks Phase-9-Effizienz**: Phase-10a war ähnliche Task-Größe wie Phase-9, gleicher Quality-Fix-Anteil (~75% der Tasks bekamen Quality-Fixes, alle minor). Pattern ist robust.
+- **Test-Verschärfung in Quality-Reviews findet echte Bugs**: Bei Task 5 (wire say()) hat ein verschärfter Test (von `<=10` auf `==10`) einen unbeabsichtigten Cap-Konflikt aufgedeckt: `max_iterations=5` (LLM-Loop) cappt VOR `MAX_CONSULT_CALLS_PER_TURN=10` (Handler-Soft-Cap). Test musste in zwei separate Tests gesplittet werden, einer pro Cap. Bei laxerer Test-Assertion wäre der Konflikt nie aufgefallen.
+
+### Errors
+
+(keine echten Bugs in finaler Code-Base — der Sichtprüfungs-Hotfix war ein Spec-Mangel, kein Bug)
+
+
+## Iteration #3 — 2026-05-09 16:00
+
+**Type:** feature
+**Summary:** Phase 10b (Multi-Persona-Roundtable mit 3 Modi) komplett implementiert + alle 3 Spec-Restschuld-Items abgeräumt
+**Files changed:** living_vault/core/db.py (mode column + seance_session_personas table), living_vault/apps/seance_ui/store.py (mode + add/get_session_personas + count_user_turns + get_session_mode), living_vault/apps/seance_ui/roundtable.py (NEU: pick_speakers + _parse_mentions + hash_color + shared_history_for_persona), living_vault/apps/seance_ui/prompt.py (teammate_paths kw-arg + _TEAMMATE_BLOCK), living_vault/apps/seance_ui/app.py (summon multi-page + mode + roundtable_say orchestrator + 502/partial_replies + roundtable-aware export), living_vault/apps/seance_ui/static/index.html (multi-select + mode-dropdown + persona-bubbles + hashColorJs mirror), tests/test_db_migration.py, tests/test_seance_store.py, tests/test_roundtable_speakers.py (NEU), tests/test_roundtable_history.py (NEU), tests/test_seance_prompt.py, tests/test_seance_app.py, tests/test_roundtable_app.py (NEU)
+**Tests:** passed (204 passed, war 156 vor Phase 10b, +48)
+**Confidence:** 5/5
+**Tags:** python, fastapi, anthropic, tool-use, multi-persona, roundtable, mode-dispatch, shared-history, ui-color-coding, deterministic-hash, schema-migration, tdd, subagent-driven, live-smoke, partial-failure-handling, export-rendering
+
+### Details
+
+Phase 10b komplett: 9 Plan-Tasks via subagent-driven-development + 3 Restschuld-Items. 21 Commits gesamt (9 Implementation + 7 Quality-Tightening + 1 Closing + 4 Restschuld). Approach A (Symmetrische Architektur): Roundtable als Wrapper um N parallele Persona-States, wiederverwendet 80% der Phase-10a-Code-Pfade. Drei Modi (round-robin / moderator / freeforall) via pick_speakers-Dispatch. 1-8 Personas pro Roundtable. Cross-Persona-Consult: Allowlist erweitert um Teammate-Paths. Geteilte History via labeled-user-Wrapping ("[stem says]: text") weil Anthropic-API nur user/assistant-Roles kennt. Hash-deterministische Persona-Colors aus 8-Cyberpunk-Palette (Python `sum(ord(c)) % 8`, JS `sum(charCodeAt) % 8` als Mirror).
+
+Sichtprüfung 2026-05-09: alle 3 Modi positiv durchlaufen. User-Verdikt: "geil, geil. Es funktioniert alles, wie es es soll. Supertoll, supertoll."
+
+Restschuld nach Final-Review:
+- R1 (`db29921`): Prompt-Drift in _TEAMMATE_BLOCK ("Pfade in der Liste oben" → "die folgenden Pfade sind zusätzlich erlaubt")
+- R2 (`067df2c`): 502/partial_replies bei mid-loop-API-Fehler (try/except um respond_with_tools-Call, HTTPException 502 mit detail.partial_replies + tool_events + failed_persona)
+- R3 (`652fcc2`): Roundtable-aware Export (per-persona-stem-Labels statt **Page**, tool_use als readable Italic-Lines statt raw JSON, mode: in Frontmatter)
+
+### Learnings
+
+- **Approach A (Symmetric Wrapper) ist die richtige Wahl bei feature-Erweiterungen die einen bestehenden Code-Pfad multiplexen**: Statt eine zweite Endpoint-/LLM-Klasse zu bauen war Phase 10b ein dünner Wrapper um die Phase-10a-Tool-Loop, der pro Persona einmal durchläuft. Wiederverwendung von make_consult_neighbor_handler, respond_with_tools, FakeLLMWithTools, store-Funktionen war bei jedem Schritt unverändert.
+- **Geteilte History via labeled-user-Wrapping ist eine elegante Anthropic-API-Workaround**: Anthropic kennt nur user/assistant-Roles. Andere Personas' Antworten als `("user", "[stem says]: text")` zu rendern lässt den LLM-Call die Beiträge der Mitstreiter als "externer Stimulus" lesen, ohne API-Fight. Test 5 in test_roundtable_history.py beweist die korrekte Verschachtelung über mehrere Turns.
+- **Hash-deterministische Colors brauchen einen MIRROR-Comment auf BEIDEN Seiten**: Python und JS hashen jeweils `sum(char_codes) % len(PALETTE)`. Wenn nur eine Seite geändert wird, divergieren live-Sessions und historische Replays in der Farbgebung. Quality-Reviewer hat gefordert dass `hash_color` in roundtable.py einen `MIRROR: living_vault/apps/seance_ui/static/index.html hashColorJs()` Block bekommt, JS hat einen Mirror-Comment in die andere Richtung. Cross-language-Code-Symmetrie ist nur durch explicite Comments verifierbar.
+- **Closure-Trap bei Multi-Iteration-Schleifen**: Ohne `_events=speaker_tool_events, _h=raw_handler` als Default-Args würden alle Closure-Captures in der Speaker-Loop auf die LAST-Iteration-Bindings zeigen (Python late-binding). Default-Arg-Early-Binding ist die idiomatische Lösung — hat der Quality-Reviewer für Task 7 explizit verifiziert.
+- **TOCTOU im double-build_persona-Pattern**: Task 6 hatte ursprünglich `build_persona(paths[0])` zweimal (einmal zur Validation, einmal für die `persona`-Response-Field). Wenn die Page zwischen den Calls verschwindet → silent omission der `persona`-Key in der Response. Capturing-Loop in `built_personas` schließt das Fenster. Quality-Reviewer hat das früh genug gefangen.
+- **Empty-Set-Iteration ist nicht-deterministisch**: `persona_paths = {p["persona_path"] for p in personas}` produziert Set-Iteration in nicht-deterministischer Reihenfolge → System-Prompt drifted zwischen Runs. Fix: list comprehension `persona_paths_ordered = [p["persona_path"] for p in personas]` (Python 3.7+ insertion order). Wichtig wenn der Prompt jemals snapshot-getestet werden soll.
+
+### Errors
+
+(keine echten Bugs in finaler Code-Base — alle Quality-Items im Cross-Review-Loop als Tightening-Commits adressiert)
