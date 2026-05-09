@@ -334,3 +334,77 @@ def test_roundtable_first_speaker_failure_returns_502_with_empty_partial(
     detail = r.json()["detail"]
     assert detail["partial_replies"] == []
     assert "error" in detail
+
+
+# === Phase-10b Restschuld 3: roundtable-aware export ===
+
+
+def test_export_roundtable_session_renders_per_persona_labels(
+    vault_copy, db_path, monkeypatch, tmp_path
+):
+    """Roundtable session export must render each assistant turn with its
+    persona-stem label (e.g. '**note-a**:') rather than the generic
+    '**Page**:' that single-mode sessions use. Tool-use rows must render
+    as a readable bullet ('» consulted [[X]] (N chars)'), not raw JSON."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    monkeypatch.setenv("LIVING_VAULT_EXPORT_DIR", str(tmp_path))
+    scripts = [
+        [
+            {"type": "tool_use", "name": "consult_neighbor",
+             "input": {"neighbor_path": "concepts/note-b.md"}},
+            {"type": "text", "text": "I am note-a, having read note-b"},
+        ],
+        [{"type": "text", "text": "I am note-b"}],
+    ]
+    client, _ = _client_with_iter_llms(vault_copy, db_path, monkeypatch, scripts)
+    sid = client.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "freeforall",
+    }).json()["session_id"]
+    client.post("/api/say", json={"session_id": sid, "text": "hello all"})
+
+    r = client.post(f"/api/sessions/{sid}/export")
+    assert r.status_code == 200, r.text
+    out_path = Path(r.json()["exported_to"])
+    text = out_path.read_text(encoding="utf-8")
+
+    # Persona labels per assistant turn (stem-based, not generic "**Page**")
+    assert "**note-a**" in text
+    assert "**note-b**" in text
+    assert "**Page**" not in text  # generic label MUST NOT appear in roundtable export
+    # Both replies present
+    assert "I am note-a, having read note-b" in text
+    assert "I am note-b" in text
+    # Tool-use rendered readably, NOT as raw JSON
+    assert "consulted" in text.lower()
+    assert "[[" in text and "concepts/note-b.md" in text  # wikilink form
+    # And NOT the raw JSON dump
+    assert '"tool_name"' not in text
+    # Mode appears in frontmatter for roundtable sessions (so future readers
+    # know which mode produced the transcript)
+    assert "mode: freeforall" in text
+
+
+def test_export_single_mode_session_remains_phase10a_format(
+    vault_copy, db_path, monkeypatch, tmp_path
+):
+    """Phase-10a export format must be preserved for single-mode sessions:
+    '**You**:' for user, '**Page**:' for assistant, no mode line."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    monkeypatch.setenv("LIVING_VAULT_EXPORT_DIR", str(tmp_path))
+    scripts = [[{"type": "text", "text": "I am the page"}]]
+    client, _ = _client_with_iter_llms(vault_copy, db_path, monkeypatch, scripts)
+    sid = client.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+    client.post("/api/say", json={"session_id": sid, "text": "wer?"})
+
+    r = client.post(f"/api/sessions/{sid}/export")
+    assert r.status_code == 200, r.text
+    text = Path(r.json()["exported_to"]).read_text(encoding="utf-8")
+    # Phase-10a format
+    assert "**You**" in text
+    assert "**Page**" in text  # legacy generic label kept for single-mode
+    # No mode line for single-mode (or mode: single is OK; just verify single-mode still works)
+    assert "I am the page" in text
+    assert "wer?" in text

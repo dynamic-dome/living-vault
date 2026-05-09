@@ -418,17 +418,34 @@ def _export_dir() -> Path:
     return Path.home() / "wiki" / "wiki" / "queries"
 
 
-def _format_session_markdown(detail: dict) -> str:
+def _format_session_markdown(detail: dict, mode: str | None = None) -> str:
+    """Render a séance session as Markdown.
+
+    Single-mode sessions (Phase-10a): keep the legacy '**You**:' / '**Page**:'
+    labels for backward-compat with existing exports.
+
+    Roundtable sessions (Phase-10b: roundrobin / moderator / freeforall):
+    label each assistant turn with its persona-stem (e.g. '**note-a**:'),
+    render tool-use rows as readable lines ('» consulted [[X]] (N chars)')
+    instead of raw JSON, and add a `mode:` field to the frontmatter.
+    """
+    import json
     from datetime import datetime
     started = detail.get("started_at", "")
     date_part = started[:10] if started else datetime.now().strftime("%Y-%m-%d")
     page_path = detail["page_path"]
-    fm = [
+    is_roundtable = mode is not None and mode != "single"
+
+    fm: list[str] = [
         "---",
         "type: seance-transcript",
         f"date: {date_part}",
         f"started_at: {started}",
         f"summoned_page: {page_path}",
+    ]
+    if is_roundtable:
+        fm.append(f"mode: {mode}")
+    fm += [
         "tags: [seance, transcript]",
         "---",
         "",
@@ -437,12 +454,51 @@ def _format_session_markdown(detail: dict) -> str:
         f"Conversation with the wiki page `[[wiki/{page_path[:-3] if page_path.endswith('.md') else page_path}]]`.",
         "",
     ]
+
     for m in detail["messages"]:
-        role = "**You**" if m["role"] == "user" else "**Page**"
-        fm.append(f"{role}:")
+        role = m["role"]
+        content = m["content"]
+
+        if role == "user":
+            fm.append("**You**:")
+            fm.append("")
+            fm.append(content)
+            fm.append("")
+            continue
+
+        if role == "tool_use":
+            # Render readably, not as raw JSON. Same format the UI uses
+            # (» consulted [[path]] (N chars) | » NAME failed: ERROR).
+            try:
+                payload = json.loads(content)
+            except (ValueError, TypeError):
+                fm.append(f"_unreadable tool event: {content}_")
+                fm.append("")
+                continue
+            summary = payload.get("tool_result_summary", {}) or {}
+            tool_name = payload.get("tool_name", "?")
+            args = payload.get("tool_args", {}) or {}
+            if "error" in summary:
+                fm.append(f"_» {tool_name} failed: {summary['error']}_")
+            else:
+                npath = args.get("neighbor_path", "?")
+                chars = summary.get("chars", 0)
+                fm.append(f"_» consulted [[{npath}]] ({chars} chars)_")
+            fm.append("")
+            continue
+
+        # role == "assistant": single-mode → **Page**, roundtable → **<stem>**
+        if is_roundtable:
+            persona_path = m.get("persona_path") or page_path
+            stem = Path(persona_path).stem
+            label = f"**{stem}**"
+        else:
+            label = "**Page**"
+        fm.append(f"{label}:")
         fm.append("")
-        fm.append(m["content"])
+        fm.append(content)
         fm.append("")
+
     return "\n".join(fm)
 
 
@@ -451,6 +507,9 @@ def export_session_endpoint(session_id: int) -> dict:
     detail = store.get_session_detail(_db_path(), session_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"session {session_id} not found")
+    # Phase-10b: pass session mode so the formatter can render roundtable
+    # sessions with per-persona labels and a mode-frontmatter field.
+    mode = store.get_session_mode(_db_path(), session_id)
     out_dir = _export_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     started = detail.get("started_at", "")
@@ -458,7 +517,7 @@ def export_session_endpoint(session_id: int) -> dict:
     page_slug = _slugify(detail["page_path"].replace(".md", ""))
     fname = f"{date_part}-seance-{page_slug}.md"
     out_path = out_dir / fname
-    out_path.write_text(_format_session_markdown(detail), encoding="utf-8")
+    out_path.write_text(_format_session_markdown(detail, mode=mode), encoding="utf-8")
     return {"exported_to": str(out_path), "session_id": session_id}
 
 
