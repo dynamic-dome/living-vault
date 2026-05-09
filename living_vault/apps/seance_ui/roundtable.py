@@ -143,7 +143,7 @@ def shared_history_for_persona(
             if r["persona_path"] == persona_path:
                 out.append(("assistant", r["content"]))
             else:
-                other_stem = Path(r["persona_path"] or "").stem
+                other_stem = Path(r["persona_path"] or "").stem or "unknown"
                 out.append(("user", f"[{other_stem} says]: {r['content']}"))
         return out
     finally:
