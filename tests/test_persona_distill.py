@@ -20,7 +20,7 @@ def test_distill_returns_string():
 
 def test_distill_passes_body_into_prompt():
     """The page body is what gives the LLM something to react to. Verify it's
-    actually included in the system prompt the FakeLLM sees."""
+    actually included in the payload the LLM sees."""
     captured = {}
 
     class CapturingLLM:
@@ -45,15 +45,33 @@ def test_distill_truncates_body_at_8000_chars():
             captured["history"] = history
             return "ok"
 
-    huge = "ABCDEFGH" * 2000  # 16k chars
+    # Build a body where the first 8000 chars are all 'A' and the next 100 are all 'Z'
+    # — the 'Z' segment should NOT appear in the payload
+    huge = ("A" * 8000) + ("Z" * 100) + ("A" * 8000)  # 16100 chars total
     distill_voice_via_llm(_page(body=huge), CapturingLLM())
     full_payload = captured["system"] + " " + " ".join(m for _, m in captured["history"])
-    # The 8001th char onwards should not appear
-    # We ensure the payload is shorter than the full huge body
-    assert len(full_payload) < len(huge) + 4000  # 4k slack for prompt boilerplate
+    # Tight check: the 'Z' segment past the 8000-char cap must NOT be in payload
+    assert "Z" * 100 not in full_payload
+    # Sanity: the 'A' prefix that fits within the cap IS in payload
+    assert "A" * 100 in full_payload
 
 
 def test_default_prompt_is_present_and_nonempty():
     assert isinstance(DEFAULT_DISTILL_PROMPT, str)
     assert "voice" in DEFAULT_DISTILL_PROMPT.lower()
     assert "summary" in DEFAULT_DISTILL_PROMPT.lower() or "description" in DEFAULT_DISTILL_PROMPT.lower()
+
+
+def test_distill_accepts_custom_system_prompt():
+    """The system_prompt kwarg overrides DEFAULT_DISTILL_PROMPT when supplied."""
+    captured = {}
+
+    class CapturingLLM:
+        def respond(self, system, history):
+            captured["system"] = system
+            captured["history"] = history
+            return "ok"
+
+    custom = "Pretend you are a haiku critic."
+    distill_voice_via_llm(_page(), CapturingLLM(), system_prompt=custom)
+    assert captured["system"] == custom

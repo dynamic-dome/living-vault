@@ -46,14 +46,16 @@ def _build_user_message(page: dict) -> str:
     )
 
 
-def distill_voice_via_llm(page: dict, llm: LLM) -> str:
+def distill_voice_via_llm(page: dict, llm: LLM, *, system_prompt: str = DEFAULT_DISTILL_PROMPT) -> str:
     """Ask `llm` to describe the page's voice. Returns the LLM's text response.
 
     `page` is a dict with at least `title`, `created`, `tags`, `body` keys.
+    `system_prompt` defaults to DEFAULT_DISTILL_PROMPT but can be overridden
+    for experimentation or A/B testing.
     Caller is responsible for handling exceptions (network, rate-limit, etc).
     """
     user_msg = _build_user_message(page)
     return llm.respond(
-        system=DEFAULT_DISTILL_PROMPT,
+        system=system_prompt,
         history=[("user", user_msg)],
     )
