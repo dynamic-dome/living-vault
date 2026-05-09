@@ -26,6 +26,27 @@
     .msg{margin:8px 0;padding:8px 10px;border-radius:6px;}
     .msg.user{background:#13202c;}
     .msg.assistant{background:#1a2e1c;}
+    .toolEvent{
+      margin:6px 0 4px 12px;
+      padding:4px 10px;
+      border-left:2px solid #4a8;
+      font-size:11px;
+      font-style:italic;
+      color:#9bd;
+      opacity:.85;
+    }
+    .toolEvent.error{
+      border-left-color:#c66;
+      color:#daa;
+    }
+    .toolEvent .wikilink{
+      color:#cfe;
+      font-weight:bold;
+    }
+    .budgetWarning{
+      border-left-color:#e80;
+      color:#fc8;
+    }
     #form{display:flex;gap:8px;}
     #txt{flex:1;background:#13202c;border:1px solid #234;color:#cfe;padding:8px;border-radius:4px;font-family:inherit;}
     button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;font-family:inherit;}
@@ -97,7 +118,22 @@ async function loadSessionIntoChat(sessionId, pagePath){
   sid = sessionId;
   document.getElementById("who").textContent = "viewing past session: " + pagePath;
   document.getElementById("log").innerHTML = "";
-  j.messages.forEach(m => appendMsg(m.role, m.content));
+  j.messages.forEach(m => {
+    if (m.role === "tool_use"){
+      try {
+        const payload = JSON.parse(m.content);
+        appendToolEvent({
+          tool_name: payload.tool_name,
+          tool_args: payload.tool_args,
+          tool_result_summary: payload.tool_result_summary,
+        }, 0, 1);
+      } catch(e) {
+        appendMsg("assistant", "(unreadable tool event)");
+      }
+    } else {
+      appendMsg(m.role, m.content);
+    }
+  });
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
   document.getElementById("exportBtn").disabled = false;
@@ -145,6 +181,9 @@ document.getElementById("form").onsubmit = async (ev) => {
   appendMsg("user", userText);
   const r = await fetch("/api/say",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sid,text:userText})});
   const j = await r.json();
+  if (Array.isArray(j.tool_events)) {
+    j.tool_events.forEach((ev, idx) => appendToolEvent(ev, idx, j.tool_events.length));
+  }
   appendMsg("assistant", j.reply || "(no reply)");
 };
 
@@ -152,6 +191,33 @@ function appendMsg(role, text){
   const log = document.getElementById("log");
   const d = document.createElement("div"); d.className="msg "+role; d.textContent = text;
   log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+
+function appendToolEvent(ev, idx, total){
+  const log = document.getElementById("log");
+  const d = document.createElement("div");
+  d.className = "toolEvent";
+  const summary = ev.tool_result_summary || {};
+  if (summary.error){
+    d.classList.add("error");
+    d.textContent = `» ${ev.tool_name} failed: ${summary.error}`;
+  } else {
+    const path = (ev.tool_args && ev.tool_args.neighbor_path) || "?";
+    const chars = summary.chars || 0;
+    d.innerHTML = `» consulted <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} chars)`;
+    if (idx + 1 >= 7 && total <= 10){
+      d.classList.add("budgetWarning");
+      d.innerHTML += ` <span style="opacity:.7">— nearing budget (${idx + 1}/10)</span>`;
+    }
+  }
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
 }
 
 loadPages();
