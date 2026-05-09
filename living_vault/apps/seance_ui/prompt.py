@@ -104,8 +104,8 @@ def _format_neighbors_with_paths(titles: list[str], paths: list[str]) -> str:
 _TEAMMATE_BLOCK = """
 # Andere Personas am Tisch
 Du sitzt aktuell mit weiteren Personas an einem Roundtable. Du kannst sie
-über `consult_neighbor` direkt befragen — ihre Pfade sind in der Liste
-oben mit aufgeführt. Die Teammates an diesem Tisch sind:
+über `consult_neighbor` direkt befragen — die folgenden Pfade sind
+zusätzlich zu deinen normalen Nachbarn erlaubt:
 {teammate_lines}
 Antworte so, dass dein Beitrag zum Gespräch passt: greife auf, was sie
 gesagt haben (siehst du als '[<path-stem> says]: ...' in der History,
