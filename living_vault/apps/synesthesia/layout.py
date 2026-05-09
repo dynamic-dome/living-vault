@@ -32,6 +32,11 @@ def _pca_3d(matrix: np.ndarray, scale: float = 100.0) -> np.ndarray:
     u, s, vh = np.linalg.svd(centered, full_matrices=False)
     components = vh[:3]
     proj = centered @ components.T
+    # Pad to 3 columns when fewer than 3 PCA components are available
+    # (happens when n_samples < 3 — SVD yields min(n_samples, n_features) components).
+    if proj.shape[1] < 3:
+        pad = np.zeros((proj.shape[0], 3 - proj.shape[1]), dtype=proj.dtype)
+        proj = np.concatenate([proj, pad], axis=1)
     max_abs = float(np.abs(proj).max() or 1.0)
     return (proj / max_abs * scale).astype(np.float32)
 
