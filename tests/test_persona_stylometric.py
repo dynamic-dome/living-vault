@@ -120,3 +120,12 @@ def test_empty_body_returns_zeroed_defaults_no_crash():
 def test_single_sentence_no_separator_does_not_crash():
     out = extract_stylometric("Hello world")
     assert out["preferred_separator"] in {"—", ":", ";", ",", ""}
+
+
+def test_pure_code_body_has_nonzero_code_density():
+    """Regression: early-return path used to silently return code_density=0.0 for
+    pure-code bodies (no prose sentences). After fix, code_density reflects truth."""
+    body = "```python\ndef x(): return 1\n```"
+    out = extract_stylometric(body)
+    assert out["code_density"] > 0.0
+    assert out["avg_sentence_length"] == 0.0  # still no sentences

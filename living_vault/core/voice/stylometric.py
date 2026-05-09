@@ -25,7 +25,7 @@ _STOPWORDS: frozenset[str] = frozenset({
     "dass", "weil", "denn", "als", "wie", "wo", "was", "warum", "wer", "wem",
     "wen", "welche", "welcher", "welches", "wieder", "noch", "schon", "auch",
     "so", "doch", "nur", "mehr", "sehr", "etwas", "alles", "nichts", "viel",
-    "wenig", "andere", "anderen", "wenig", "genug", "ja", "nein", "vielleicht",
+    "wenig", "andere", "anderen", "genug", "ja", "nein", "vielleicht",
     # english
     "the", "a", "an", "and", "or", "but", "not", "no", "is", "are", "was",
     "were", "be", "been", "being", "have", "has", "had", "having", "do",
@@ -147,11 +147,24 @@ def extract_stylometric(body: str) -> dict:
     Always returns the same key set. Empty/short bodies get sane zeros.
     """
     body = _truncate_body(body or "")
+
+    # --- Body-level features (independent of sentence split) ---
+    lines = [ln for ln in body.splitlines() if ln.strip()]
+    list_lines = sum(1 for ln in lines if _LIST_LINE_RE.match(ln))
+    list_density = (list_lines / len(lines)) if lines else 0.0
+
+    code_chars = sum(len(m.group(0)) for m in _FENCED_BLOCK_RE.finditer(body))
+    code_density = (code_chars / len(body)) if body else 0.0
+
+    preferred_sep = _preferred_separator(body)
+
+    # --- Sentence-level features ---
     body_for_sentences = _strip_markdown_for_sentences(body)
     sentences = _split_sentences(body_for_sentences)
     n_sentences = len(sentences)
 
     if n_sentences == 0:
+        wl_count = len(_WIKILINK_RE.findall(body))
         return {
             "avg_sentence_length": 0.0,
             "sentence_length_stddev": 0.0,
@@ -159,11 +172,11 @@ def extract_stylometric(body: str) -> dict:
             "exclamation_rate": 0.0,
             "first_person_rate": 0.0,
             "second_person_rate": 0.0,
-            "preferred_separator": "",
-            "list_density": 0.0,
-            "code_density": 0.0,
+            "preferred_separator": preferred_sep,
+            "list_density": round(list_density, 3),
+            "code_density": round(code_density, 3),
             "wikilink_density": 0.0,
-            "top_phrases": [],
+            "top_phrases": _top_phrases(body),
             "register": _classify_register(body),
         }
 
@@ -181,19 +194,10 @@ def extract_stylometric(body: str) -> dict:
     fp_rate = sum(1 for s in sentences if has_token(s, _FIRST_PERSON_TOKENS)) / n_sentences
     sp_rate = sum(1 for s in sentences if has_token(s, _SECOND_PERSON_TOKENS)) / n_sentences
 
-    # list_density: fraction of non-blank lines that are list lines
-    lines = [ln for ln in body.splitlines() if ln.strip()]
-    list_lines = sum(1 for ln in lines if _LIST_LINE_RE.match(ln))
-    list_density = (list_lines / len(lines)) if lines else 0.0
-
-    # code_density: fraction of body chars inside fenced blocks
-    code_chars = sum(len(m.group(0)) for m in _FENCED_BLOCK_RE.finditer(body))
-    code_density = (code_chars / len(body)) if body else 0.0
-
     # wikilink_density: count per 100 words
     n_words = sum(sentence_word_counts) or 1
     wl_count = len(_WIKILINK_RE.findall(body))
-    wl_density = (wl_count / n_words) * 100 if n_words else 0.0
+    wl_density = (wl_count / n_words) * 100
 
     return {
         "avg_sentence_length": round(avg, 2),
@@ -202,7 +206,7 @@ def extract_stylometric(body: str) -> dict:
         "exclamation_rate": round(e_rate, 3),
         "first_person_rate": round(fp_rate, 3),
         "second_person_rate": round(sp_rate, 3),
-        "preferred_separator": _preferred_separator(body),
+        "preferred_separator": preferred_sep,
         "list_density": round(list_density, 3),
         "code_density": round(code_density, 3),
         "wikilink_density": round(wl_density, 3),
