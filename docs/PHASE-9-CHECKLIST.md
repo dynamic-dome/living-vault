@@ -64,8 +64,8 @@ Status is set MANUALLY after verification — auto-ticking is not allowed.
       persona, prompt-cases, extract-voice CLI)
 - [x] No Phase-1 test regressed
 - [x] No `~/wiki/` access from any test (verified by `real_wiki_guard`
-      fixture, which monkeypatches `open()` to refuse paths under
-      `~/wiki/`)
+      autouse fixture, which monkeypatches `open()` to refuse paths under
+      `~/wiki/`; proven by `tests/test_real_wiki_guard_proof.py`)
 - [x] No real Anthropic calls from any test (verified — FakeLLM only via
       `LIVING_VAULT_FAKE_LLM=1` env var or direct injection)
 

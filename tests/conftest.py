@@ -33,7 +33,7 @@ def db_path(tmp_path: Path) -> Path:
     return tmp_path / ".vault-engine.db"
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def real_wiki_guard(monkeypatch):
     """Hard guard: any attempt to open ~/wiki paths raises."""
     real_root = (Path.home() / "wiki").resolve()
