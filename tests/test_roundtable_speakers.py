@@ -70,6 +70,27 @@ def test_parse_mentions_dedup():
     assert out == [p[0]]
 
 
+def test_parse_mentions_does_not_match_inside_email():
+    """A `@stem` inside an email address (e.g. ping@alpha.com) must NOT match.
+    The negative lookbehind in the regex guards against this false positive."""
+    p = _personas()
+    out = _parse_mentions("Send to ping@alpha.com please", p)
+    assert out == []
+    # but a standalone mention in the same string still works
+    out2 = _parse_mentions("ping@alpha.com but also @alpha standalone", p)
+    assert out2 == [p[0]]
+
+
+def test_parse_mentions_works_after_punctuation():
+    """A `@stem` after comma/space must still match (only word chars + dot
+    are blocked by the lookbehind)."""
+    p = _personas()
+    out = _parse_mentions("Hey,@alpha what?", p)
+    assert out == [p[0]]
+    out2 = _parse_mentions("@alpha at start", p)
+    assert out2 == [p[0]]
+
+
 def test_hash_color_is_deterministic_and_in_palette():
     c1 = hash_color("concepts/alpha.md")
     c2 = hash_color("concepts/alpha.md")

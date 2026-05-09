@@ -28,7 +28,13 @@ PALETTE: list[str] = [
 ]
 
 
+# All known session modes. Used by summon() to validate user input.
+# Note: 'single' is in this set (it's a valid session mode), but pick_speakers
+# only accepts the three roundtable modes — single-mode sessions never reach
+# pick_speakers because say() branches on mode and routes single → existing
+# Phase-10a path, not roundtable_say.
 VALID_MODES = frozenset({"single", "roundrobin", "moderator", "freeforall"})
+ROUNDTABLE_MODES = frozenset({"roundrobin", "moderator", "freeforall"})
 
 
 def hash_color(persona_path: str) -> str:
@@ -40,26 +46,27 @@ def hash_color(persona_path: str) -> str:
 
 
 def _parse_mentions(text: str, personas: list[dict]) -> list[dict]:
-    """Find @{stem} mentions in text and return matching personas in
-    order of first appearance. Case-insensitive, dedup."""
-    mentioned: list[dict] = []
-    seen_paths: set[str] = set()
+    """Find @{stem} mentions in text and return matching personas in order
+    of first appearance. Case-insensitive. Each persona appears at most once
+    in the result (the per-persona `break` below caps it after the first hit).
+
+    The negative lookbehind `(?<![\\w.])` guards against false positives in
+    email addresses (e.g. "ping@alpha.com" should NOT match the @alpha mention,
+    because the `@` is preceded by `g` which is a word char). Standalone `@alpha`
+    or punctuation-prefixed `, @alpha` still match correctly."""
     text_lower = text.lower()
-    # We scan personas in the order they're given, but resolve to mention
-    # position so that @gamma before @alpha returns [gamma, alpha].
+    # Collect (position, persona) pairs, then sort by position so that
+    # "@gamma and @alpha" returns [gamma, alpha].
     positions: list[tuple[int, dict]] = []
     for p in personas:
         stem = Path(p["persona_path"]).stem.lower()
-        # match @stem with word boundary on the right
-        for m in re.finditer(rf"@{re.escape(stem)}\b", text_lower):
+        # left-side: prevent email-like matches (no word char or '.' before @)
+        # right-side: word boundary so @alpha doesn't swallow @alphabet
+        for m in re.finditer(rf"(?<![\w.])@{re.escape(stem)}\b", text_lower):
             positions.append((m.start(), p))
-            break  # first occurrence per persona is enough for dedup
+            break  # first hit per persona is enough — caps the dedup
     positions.sort(key=lambda t: t[0])
-    for _, p in positions:
-        if p["persona_path"] not in seen_paths:
-            mentioned.append(p)
-            seen_paths.add(p["persona_path"])
-    return mentioned
+    return [p for _, p in positions]
 
 
 def pick_speakers(
