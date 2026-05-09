@@ -125,11 +125,31 @@ def test_extract_voice_aborts_when_user_says_no(
         ["extract-voice", "--vault", str(vault_copy), "--db", str(db_path)],
         input="n\n",
     )
-    # Click returns exit_code 1 when click.confirm is rejected with abort=True
-    assert res.exit_code != 0 or "abort" in res.output.lower() or "aborted" in res.output.lower()
+    # Click's click.confirm(abort=True) raises Abort → exit_code 1 + "Aborted!" output
+    assert res.exit_code == 1
+    assert "Aborted" in res.output
     con = sqlite3.connect(str(db_path))
     n = con.execute(
         "SELECT COUNT(*) FROM pages WHERE voice_distilled IS NOT NULL"
     ).fetchone()[0]
     con.close()
     assert n == 0
+
+
+def test_extract_voice_nothing_to_do_on_empty_db(tmp_path: Path, monkeypatch):
+    """A freshly-initialized DB with no indexed pages should report 'Nothing to do.'
+    cleanly, exit 0, write nothing."""
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
+    db_path = tmp_path / ".vault-engine.db"
+    vault_root = tmp_path / "vault"
+    vault_root.mkdir()
+    db_mod.initialize(db_path)
+    # NOTE: deliberately NOT calling index_vault — the DB has 0 pages
+
+    runner = CliRunner()
+    res = runner.invoke(
+        cli,
+        ["extract-voice", "--vault", str(vault_root), "--db", str(db_path), "--yes"],
+    )
+    assert res.exit_code == 0, res.output
+    assert "Nothing to do" in res.output
