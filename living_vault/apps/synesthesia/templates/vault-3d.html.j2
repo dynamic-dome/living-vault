@@ -7,6 +7,16 @@
     html, body { margin:0; height:100%; background:#0a0a0f; color:#cfe; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace; overflow:hidden; }
     #info { position:fixed; top:8px; left:8px; padding:6px 10px; background:rgba(0,0,0,.5); border-radius:4px; font-size:12px; z-index:5; }
     #picked { position:fixed; bottom:8px; left:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:12px; max-width:60ch; white-space:pre-wrap; z-index:5; }
+    {% if include_history %}
+    #history { position:fixed; bottom:8px; right:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:11px; max-width:48ch; max-height:18em; overflow-y:auto; z-index:5; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace; }
+    #history h4 { margin: 0 0 4px 0; font-size:11px; color:#fa7; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; }
+    #history ul { margin:0; padding:0; list-style:none; }
+    #history li { padding:2px 0; border-bottom:1px dotted #345; color:#9ab; }
+    #history li:last-child { border-bottom:none; }
+    #history li .h-date { color:#7ad; }
+    #history li .h-sha { color:#fa7; margin: 0 6px; }
+    #history .h-empty { color:#567; font-style:italic; }
+    {% endif %}
     {% if embed_url %}
     #brand { position:fixed; top:0; left:0; right:0; padding:10px 14px; background:linear-gradient(180deg, rgba(10,10,15,0.92), rgba(10,10,15,0)); display:flex; justify-content:space-between; align-items:baseline; gap:1em; font-size:13px; z-index:4; pointer-events:none; }
     #brand .b-host { color:#fa7; letter-spacing:0.04em; font-weight:600; }
@@ -25,6 +35,9 @@
   {% endif %}
   <div id="info">{{ count }} pages | {{ edge_count }} links | drag to orbit | scroll to zoom</div>
   <div id="picked"></div>
+  {% if include_history %}
+  <div id="history"><h4>History (last 10 commits)</h4><div class="h-empty">hover a node to see git history</div></div>
+  {% endif %}
   <script type="importmap">
   {
     "imports": {
@@ -94,6 +107,43 @@
       mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
     });
 
+    {% if include_history %}
+    // history.json is fetched lazily on first hover and cached in memory.
+    let _historyData = null;
+    let _lastHistoryPath = null;
+    async function _loadHistory() {
+      if (_historyData !== null) return _historyData;
+      try {
+        const r = await fetch("history.json");
+        _historyData = (await r.json()).pages || {};
+      } catch (e) {
+        _historyData = {};
+      }
+      return _historyData;
+    }
+    function _renderHistoryFor(path) {
+      if (path === _lastHistoryPath) return;
+      _lastHistoryPath = path;
+      const el = document.getElementById("history");
+      const rows = (_historyData && _historyData[path]) || [];
+      let body = '<h4>History (last 10 commits)</h4>';
+      if (rows.length === 0) {
+        body += '<div class="h-empty">no git history</div>';
+      } else {
+        body += '<ul>';
+        for (const c of rows) {
+          const dateShort = (c.date || "").slice(0, 10);
+          const sha = c.sha || "";
+          const subject = c.subject || "";
+          body += `<li><span class="h-date">${dateShort}</span><span class="h-sha">${sha}</span>${subject.replace(/[<>&]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[ch]))}</li>`;
+        }
+        body += '</ul>';
+      }
+      el.innerHTML = body;
+    }
+    _loadHistory();
+    {% endif %}
+
     function tick() {
       requestAnimationFrame(tick);
       controls.update();
@@ -103,6 +153,9 @@
       if (hits.length > 0) {
         const n = hits[0].object.userData;
         pickedEl.textContent = `${n.cluster}/${n.title}\n${n.path}\nlinks: ${n.degree}`;
+        {% if include_history %}
+        _renderHistoryFor(n.path);
+        {% endif %}
       } else {
         pickedEl.textContent = "";
       }

@@ -229,6 +229,41 @@ def test_public_build_html_has_branding_header(vault_copy: Path, tmp_path: Path)
     assert "schema v1" in html
 
 
+def test_public_build_html_contains_history_panel(vault_copy: Path, tmp_path: Path):
+    """Phase-13.4: with default include_history, HTML carries the history panel + JS hook."""
+    db = _setup_db(vault_copy, tmp_path)
+    out_dir = tmp_path / "out"
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        ["--vault", str(vault_copy), "--db", str(db), "--out", str(out_dir)],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+    html = (out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'id="history"' in html
+    assert "History (last 10 commits)" in html
+    assert "_loadHistory" in html
+    assert "history.json" in html
+
+
+def test_public_build_html_omits_history_panel_when_disabled(vault_copy: Path, tmp_path: Path):
+    """Phase-13.4: --no-history removes the history panel + JS — HTML byte-equivalent
+    to Phase-11 layout (no history-* DOM)."""
+    db = _setup_db(vault_copy, tmp_path)
+    out_dir = tmp_path / "out"
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        ["--vault", str(vault_copy), "--db", str(db), "--out", str(out_dir),
+         "--no-history"],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+    html = (out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'id="history"' not in html
+    assert "History (last 10 commits)" not in html
+    assert "_loadHistory" not in html
+
+
 def test_public_build_writes_history_json_by_default(vault_copy: Path, tmp_path: Path):
     """Phase-13.3: history.json is created by default. vault_copy is not a git repo,
     so the per-page history is empty — but the file must exist and have valid schema."""
