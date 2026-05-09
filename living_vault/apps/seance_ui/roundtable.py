@@ -105,3 +105,46 @@ def pick_speakers(
         return [personas[turn_idx % len(personas)]]
 
     raise ValueError(f"unknown mode: {mode}")
+
+
+def shared_history_for_persona(
+    db_path,
+    session_id: int,
+    persona_path: str,
+) -> list[tuple[str, str]]:
+    """Build a persona-specific view of the shared roundtable history.
+
+    Anthropic's API only knows 'user' and 'assistant' roles. We simulate
+    'third party persona' by wrapping other personas' replies as labeled
+    user-content (e.g. '[alpha says]: ...'), so persona-X can read what
+    teammates said as if it were external user context.
+
+    Filtering rules:
+      - role == 'user' → ('user', text) unchanged
+      - role == 'assistant' AND persona_path == this → ('assistant', text)
+      - role == 'assistant' AND other persona → ('user', '[stem says]: text')
+      - role == 'tool_use' → SKIPPED (Phase-10a asymmetry preserved)
+    """
+    from living_vault.core import db as db_mod
+    con = db_mod.connect(db_path)
+    try:
+        rows = con.execute(
+            "SELECT role, content, persona_path FROM seance_messages "
+            "WHERE session_id = ? AND role IN ('user', 'assistant') "
+            "ORDER BY id",
+            (session_id,),
+        ).fetchall()
+        out: list[tuple[str, str]] = []
+        for r in rows:
+            if r["role"] == "user":
+                out.append(("user", r["content"]))
+                continue
+            # role == 'assistant'
+            if r["persona_path"] == persona_path:
+                out.append(("assistant", r["content"]))
+            else:
+                other_stem = Path(r["persona_path"] or "").stem
+                out.append(("user", f"[{other_stem} says]: {r['content']}"))
+        return out
+    finally:
+        con.close()
