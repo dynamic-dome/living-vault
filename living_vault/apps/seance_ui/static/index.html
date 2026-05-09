@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <title>séance</title>
   <style>
-    html,body{margin:0;height:100%;background:#0a0a0f;color:#cfe;font-family:'JetBrains Mono',monospace;}
-    #wrap{display:grid;grid-template-columns:320px 1fr;height:100vh;}
-    #side{border-right:1px solid #234;display:flex;flex-direction:column;}
+    html,body{margin:0;height:100%;background:#0a0a0f;color:#cfe;font-family:'JetBrains Mono',monospace;overflow:hidden;}
+    #wrap{display:grid;grid-template-columns:320px 1fr;height:100vh;min-height:0;}
+    #side{border-right:1px solid #234;display:flex;flex-direction:column;min-height:0;min-width:0;}
     #tabs{display:flex;border-bottom:1px solid #234;}
     .tab{flex:1;padding:8px;text-align:center;cursor:pointer;font-size:12px;background:#13202c;border-right:1px solid #234;}
     .tab:last-child{border-right:none;}
@@ -17,7 +17,7 @@
     .sessionItem{padding:8px 10px;cursor:pointer;border-radius:3px;border:1px solid #234;margin-bottom:6px;background:#0f1620;}
     .sessionItem:hover{background:#1a2532;}
     .sessionMeta{font-size:10px;opacity:.65;margin-top:2px;}
-    #chat{display:flex;flex-direction:column;padding:12px;}
+    #chat{display:flex;flex-direction:column;padding:12px;min-height:0;min-width:0;}
     #header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
     #who{opacity:.85;font-size:12px;}
     #exportBtn{background:#235;color:#cfe;border:1px solid #347;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
