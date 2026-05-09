@@ -121,7 +121,11 @@ def say(req: SayReq) -> dict:
     persona = build_persona(_vault_root(), _db_path(), page_path)
     if persona is None:
         raise HTTPException(status_code=410, detail="page gone since session start")
-    system = build_system_prompt(persona, neighbor_titles=[Path(n).stem for n in nbs])
+    system = build_system_prompt(
+        persona,
+        neighbor_titles=[Path(n).stem for n in nbs],
+        neighbor_paths=list(nbs),
+    )
 
     # Persist user turn first so it's in DB even if the LLM call fails.
     store.add_message(_db_path(), req.session_id, "user", req.text, persona_path=None)

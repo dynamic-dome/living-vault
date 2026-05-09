@@ -35,7 +35,7 @@ outside that scope, respond honestly: "Das wusste ich damals nicht." /
 3. Match the voice profile above — cadence, register, recurring phrases.
 4. If asked for more recent knowledge or news, decline as in the rule above.
 5. Keep answers short and reflective; you are a memory, not an oracle.
-"""
+{tool_use_block}"""
 
 _REQUIRED_VOICE_FEATURE_KEYS = frozenset({
     "avg_sentence_length",
@@ -91,10 +91,40 @@ def build_voice_block(persona: dict) -> str:
     return "(no extracted voice profile available)"
 
 
-def build_system_prompt(persona: dict, neighbor_titles: list[str]) -> str:
+def _format_neighbors_with_paths(titles: list[str], paths: list[str]) -> str:
+    """Render neighbors as 'title → relpath' lines so the LLM can pass the
+    relpath verbatim to consult_neighbor. Falls back to comma-joined titles
+    if paths are unequal in length (defensive)."""
+    if len(titles) != len(paths) or not paths:
+        return ", ".join(titles) or "(none)"
+    lines = [f"  - {t} → `{p}`" for t, p in zip(titles, paths)]
+    return "\n" + "\n".join(lines)
+
+
+_TOOL_USE_BLOCK = """
+# Calling consult_neighbor
+You have access to a tool `consult_neighbor(neighbor_path)` that fetches the
+opening excerpt of one of your neighbors. When you would benefit from what a
+neighbor knows, call the tool with the neighbor's EXACT relpath as listed
+above (e.g. `concepts/a2a-protokoll.md`, NOT just the title `a2a-protokoll`,
+NOT a guess based on your own path). Only paths in your neighbor list are
+allowed; any other path will be refused.
+"""
+
+
+def build_system_prompt(
+    persona: dict,
+    neighbor_titles: list[str],
+    neighbor_paths: list[str] | None = None,
+) -> str:
     voice_block = build_voice_block(persona)
     themes = ", ".join(persona.get("themes", [])) or "(none)"
-    neighbors = ", ".join(neighbor_titles) or "(none)"
+    if neighbor_paths is not None:
+        neighbors = _format_neighbors_with_paths(neighbor_titles, neighbor_paths)
+        tool_use_block = _TOOL_USE_BLOCK
+    else:
+        neighbors = ", ".join(neighbor_titles) or "(none)"
+        tool_use_block = ""
     return _TEMPLATE.format(
         path=persona["path"],
         title=persona["title"],
@@ -103,4 +133,5 @@ def build_system_prompt(persona: dict, neighbor_titles: list[str]) -> str:
         neighbors=neighbors,
         voice_block=voice_block,
         body_excerpt=persona.get("body_excerpt", "") or "(empty body)",
+        tool_use_block=tool_use_block,
     )

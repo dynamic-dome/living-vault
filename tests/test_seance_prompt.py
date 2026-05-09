@@ -107,3 +107,39 @@ def test_voice_block_falls_back_when_features_missing_required_keys():
     block = build_voice_block(p)
     # falls through to Case C
     assert "no extracted voice profile" in block.lower()
+
+
+# === Phase-10a-hotfix: neighbor_paths must be in the system prompt for tool-use ===
+
+
+def test_system_prompt_includes_full_neighbor_paths_when_provided():
+    """Phase-10a: when consult_neighbor is available, the LLM must see the
+    EXACT relpaths of its neighbors — not just titles — so it can pass them
+    verbatim to the tool. Without this, the LLM would have to guess paths
+    and would call consult_neighbor with paths that fail the allowlist
+    (e.g. its own path-stem instead of the neighbor's actual relpath)."""
+    p = _persona_full()
+    out = build_system_prompt(
+        p,
+        neighbor_titles=["a2a-protokoll", "mcp-gateway"],
+        neighbor_paths=[
+            "concepts/a2a-protokoll.md",
+            "concepts/mcp-gateway.md",
+        ],
+    )
+    # full paths must be in the prompt verbatim
+    assert "concepts/a2a-protokoll.md" in out
+    assert "concepts/mcp-gateway.md" in out
+    # and the prompt must mention consult_neighbor so the LLM knows to use the paths
+    assert "consult_neighbor" in out
+
+
+def test_system_prompt_neighbor_paths_optional_for_phase1_compat():
+    """Phase-1 callers that only pass neighbor_titles must still work
+    (the parameter is optional)."""
+    p = _persona_full()
+    out = build_system_prompt(p, neighbor_titles=["note-b", "syn-1"])
+    assert "note-b" in out
+    # consult_neighbor mention is fine to omit when no paths are passed
+    # (we don't strictly require its absence — the test just verifies the
+    # legacy two-argument call shape still works without raising)
