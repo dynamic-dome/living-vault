@@ -72,11 +72,26 @@ CREATE INDEX IF NOT EXISTS idx_seance_msgs_session ON seance_messages(session_id
 """
 
 
+# Phase-9 additive columns. SQLite has no `ADD COLUMN IF NOT EXISTS` —
+# we probe with PRAGMA table_info first.
+_PHASE_9_PAGES_COLUMNS = [
+    ("voice_features", "TEXT"),    # JSON blob, deterministic stylometric
+    ("voice_distilled", "TEXT"),   # 3-5 sentence LLM voice description, NULL until extract-voice runs
+]
+
+
+def _column_exists(con: sqlite3.Connection, table: str, col: str) -> bool:
+    return any(r[1] == col for r in con.execute(f"PRAGMA table_info({table})"))
+
+
 def initialize(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(db_path))
     try:
         con.executescript(SCHEMA)
+        for col, sqltype in _PHASE_9_PAGES_COLUMNS:
+            if not _column_exists(con, "pages", col):
+                con.execute(f"ALTER TABLE pages ADD COLUMN {col} {sqltype}")
         con.commit()
     finally:
         con.close()
