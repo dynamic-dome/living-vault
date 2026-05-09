@@ -3,20 +3,24 @@
 # Eine Wiki-relpath pro Zeile (relativ zu ~/wiki).
 # # = Kommentar, Leerzeilen erlaubt.
 #
-# Jeder Pfad in dieser Datei wird beim public-build berücksichtigt,
-# auch wenn die Page kein `public: true` im Frontmatter hat.
-# Pfade die nicht in der DB existieren, werden im manifest.allowlist_skipped
-# protokolliert und sind kein Build-Fehler.
-#
-# Workflow:
-#   1. Pfad hinzufügen
-#   2. ./scripts/deploy-public-vault.ps1
-#   3. manifest.json prüfen
-#   4. out-vault/index.html lokal im Browser öffnen
-#
-# Beispiel-Pfade (auskommentiert — User füllt selbst):
-#
-# concepts/a2a-protokoll.md
-# concepts/mcp-gateway.md
-# sources/mcp-oekosystem/index.md
-# synthesis/2026-05-08-mcp-ideen-genese-notebooklm.md
+# Erste Auswahl 2026-05-09: 10 zentrale, in sich geschlossene Pages aus
+# drei Themen-Clustern, die zur Außendarstellung passen:
+#   - MCP / Agentic Stack
+#   - Living-Vault Meta (Genese-Synthese)
+#   - Mikromagnetik / 3MA / NDT (CV-Profil-Bezug)
+
+# --- MCP / Agentic Stack ---
+concepts/a2a-protokoll.md
+concepts/mcp-gateway.md
+concepts/agentic-loop.md
+concepts/agent-sdk.md
+concepts/bekannte-mcp-server.md
+
+# --- Living-Vault Meta ---
+synthesis/2026-05-08-mcp-ideen-genese-notebooklm.md
+synthesis/agentic-coding-trends-2026.md
+
+# --- Mikromagnetik / 3MA / NDT ---
+concepts/3ma-ml-pipeline.md
+concepts/3ma-x8-verfahren.md
+concepts/barkhausenrauschen.md
