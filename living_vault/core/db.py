@@ -84,6 +84,22 @@ _PHASE_10A_SEANCE_MESSAGES_COLUMNS = [
     ("persona_path", "TEXT"),  # NULL for user messages, set for assistant + tool_use
 ]
 
+# Phase-10b additive columns + new tables.
+_PHASE_10B_SEANCE_SESSIONS_COLUMNS = [
+    ("mode", "TEXT NOT NULL DEFAULT 'single'"),
+]
+
+_PHASE_10B_NEW_TABLES = """
+CREATE TABLE IF NOT EXISTS seance_session_personas (
+    session_id   INTEGER NOT NULL REFERENCES seance_sessions(id),
+    persona_path TEXT NOT NULL,
+    color        TEXT NOT NULL,
+    seat_idx     INTEGER NOT NULL,
+    PRIMARY KEY (session_id, persona_path)
+);
+CREATE INDEX IF NOT EXISTS idx_ssp_session ON seance_session_personas(session_id);
+"""
+
 
 def _column_exists(con: sqlite3.Connection, table: str, col: str) -> bool:
     return any(r[1] == col for r in con.execute(f"PRAGMA table_info({table})"))
@@ -103,6 +119,12 @@ def initialize(db_path: Path) -> None:
         for col, sqltype in _PHASE_10A_SEANCE_MESSAGES_COLUMNS:
             if not _column_exists(con, "seance_messages", col):
                 con.execute(f"ALTER TABLE seance_messages ADD COLUMN {col} {sqltype}")
+        # Phase-10b: new tables (idempotent via IF NOT EXISTS)
+        con.executescript(_PHASE_10B_NEW_TABLES)
+        # Phase-10b: additive columns on seance_sessions
+        for col, sqltype in _PHASE_10B_SEANCE_SESSIONS_COLUMNS:
+            if not _column_exists(con, "seance_sessions", col):
+                con.execute(f"ALTER TABLE seance_sessions ADD COLUMN {col} {sqltype}")
         con.commit()
     finally:
         con.close()

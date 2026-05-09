@@ -123,3 +123,76 @@ def test_initialize_persona_path_idempotent(tmp_path: Path):
     cols = {r[1] for r in con.execute("PRAGMA table_info(seance_messages)")}
     assert "persona_path" in cols
     con.close()
+
+
+def test_initialize_adds_mode_to_legacy_seance_sessions(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    # arrange: legacy DB with seance_sessions but without mode
+    con = sqlite3.connect(str(db_path))
+    con.executescript("""
+        CREATE TABLE seance_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            page_path TEXT NOT NULL,
+            started_at TEXT NOT NULL
+        );
+    """)
+    con.execute(
+        "INSERT INTO seance_sessions (page_path, started_at) VALUES (?, ?)",
+        ("legacy/page.md", "2026-05-08T00:00:00Z"),
+    )
+    con.commit()
+    con.close()
+
+    # act
+    db_mod.initialize(db_path)
+
+    # assert: column added, legacy row has default 'single'
+    con = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(seance_sessions)")}
+    assert "mode" in cols
+    row = con.execute(
+        "SELECT page_path, mode FROM seance_sessions WHERE id = 1"
+    ).fetchone()
+    assert row[0] == "legacy/page.md"
+    assert row[1] == "single"
+    con.close()
+
+
+def test_initialize_creates_seance_session_personas_table(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    db_mod.initialize(db_path)
+
+    con = sqlite3.connect(str(db_path))
+    # table exists
+    tables = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    )}
+    assert "seance_session_personas" in tables
+
+    # columns match spec
+    cols = {r[1] for r in con.execute(
+        "PRAGMA table_info(seance_session_personas)"
+    )}
+    assert cols == {"session_id", "persona_path", "color", "seat_idx"}
+
+    # primary key on (session_id, persona_path)
+    pk_cols = [
+        r[1] for r in con.execute("PRAGMA table_info(seance_session_personas)")
+        if r[5] > 0  # pk column index > 0 means part of PK
+    ]
+    assert set(pk_cols) == {"session_id", "persona_path"}
+    con.close()
+
+
+def test_phase_10b_migrations_idempotent(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    db_mod.initialize(db_path)
+    db_mod.initialize(db_path)  # second call must not raise
+    con = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(seance_sessions)")}
+    assert "mode" in cols
+    tables = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    )}
+    assert "seance_session_personas" in tables
+    con.close()
