@@ -42,8 +42,8 @@
 | 5 | séance UI Phase 1 | apps/seance_ui/ FastAPI mit Persona-Lite + session-export | ✅ |
 | 6 | living-portfolio MVP | apps/portfolio_sync/sync.py + /now + Freshness-Badges, dry-run + apply | ✅ |
 | 7 | Phase-1-Integration & Polish | End-to-End-Test, Privacy-Test-Suite, Doku, Acceptance-Checklist | ✅ |
-| 8 | **Phase-1-Abschluss-Gate** | User-Review aller drei Linsen, Entscheidung: Phase 2 starten oder pausieren | 🟡 |
-| 9 | (Phase 2) core/persona.py — Schicht 3 Persona-Vollausbau | persona.py, voice-extraction, era-marker | ⏳ |
+| 8 | **Phase-1-Abschluss-Gate** | User-Review aller drei Linsen, Entscheidung: Phase 2 starten oder pausieren | ✅ |
+| 9 | (Phase 2) core/persona.py — Schicht 3 Persona-Vollausbau | persona.py, voice-extraction, era-marker | 🟡 |
 | 10 | (Phase 2) synesthesia public subset + portfolio 3D-Embed | --public-only Modus, Privacy-Tests, Site-Embed | ⏳ |
 | 11 | (Phase 2) séance MCP-Tool + commit_insight | seance.summon, seance.commit_insight, Multi-Page-Modus | ⏳ |
 | 12 | (Phase 2) Version-History-Modal in living-portfolio | Git-Backed Page-History-API, Modal-UI | ⏳ |
@@ -133,4 +133,4 @@ Wer in dieses Projekt einsteigt, sollte zuerst:
 4. `~/wiki/wiki/synthesis/2026-05-08-mcp-ideen-genese-notebooklm.md` für Hintergrund (warum diese drei Tools)
 5. Status-Symbole in Phasen-Tabelle ernst nehmen — wer ⏳ überspringt, bricht das Fundament
 
-Aktuelle Position: **Phase 0 nicht begonnen.** Nächster Schritt: Repo-Skeleton scaffolden + sentence-transformers-Spike.
+Aktuelle Position: **Phase 8 ✅ abgeschlossen am 2026-05-09**, Phase 9 🟡 in Arbeit (Persona-Schicht 3). Nächster Schritt: Spec + Plan für `core/persona.py` Vollausbau (voice-extraction, era-marker).

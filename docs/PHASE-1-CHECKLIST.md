@@ -17,9 +17,9 @@ manuell bestätigt wurden — automatisches Ankreuzen ist nicht erlaubt.
 - [x] Lokales 3D-HTML wird gerendert mit ≥ 90 % der Pages (Task 25, 953/953 Knoten sichtbar)
 - [x] 3 Visual-Varianten (galaxy / city / network) vorhanden, Importmap-Fix wirkt
 - [x] Privacy-Regression-Test grün (Task 24)
-- [ ] **Optional**: synesthesia gegen real-wiki manuell verifiziert + visuell akzeptabel
+- [x] **Optional**: synesthesia gegen real-wiki manuell verifiziert + visuell akzeptabel
       (User-Sichtprüfung 2026-05-08: drei Varianten als brauchbar bewertet,
-      Phase-2-Backlog für Interaktion notiert)
+      Phase-2-Backlog für Interaktion notiert; nochmal bestätigt 2026-05-09 im Phase-8-Gate-Review)
 
 ## Séance
 
