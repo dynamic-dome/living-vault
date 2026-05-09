@@ -162,3 +162,82 @@ def test_cap_history_drops_oldest_when_total_chars_exceed(vault_copy, db_path, m
     capped = _cap_history(history)
     total = sum(len(content) for _, content in capped)
     assert total <= _MAX_HISTORY_TOTAL_CHARS
+
+
+def test_phase_10a_no_public_leak_after_tool_use_turn(vault_copy, db_path, monkeypatch):
+    """Phase-1 privacy regression must hold after Phase-10a tool-use turns.
+
+    Running a turn with consult_neighbor must NOT mutate is_public on any page.
+    """
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    from living_vault.core.llm import FakeLLMWithTools
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+
+    # snapshot is_public counts BEFORE
+    import sqlite3
+    con = sqlite3.connect(str(db_path))
+    before_public = con.execute("SELECT COUNT(*) FROM pages WHERE is_public = 1").fetchone()[0]
+    before_private = con.execute("SELECT COUNT(*) FROM pages WHERE is_public = 0").fetchone()[0]
+    con.close()
+
+    monkeypatch.setenv("LIVING_VAULT_ROOT", str(vault_copy))
+    monkeypatch.setenv("LIVING_VAULT_DB", str(db_path))
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
+    from importlib import reload
+    from living_vault.apps.seance_ui import app as app_mod
+    reload(app_mod)
+    fake = FakeLLMWithTools([
+        {"type": "tool_use", "name": "consult_neighbor",
+         "input": {"neighbor_path": "concepts/note-b.md"}},
+        {"type": "text", "text": "ok"},
+    ])
+    monkeypatch.setattr(app_mod, "get_llm", lambda: fake)
+    c = TestClient(app_mod.app)
+    sid = c.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+    c.post("/api/say", json={"session_id": sid, "text": "consult"})
+
+    con = sqlite3.connect(str(db_path))
+    after_public = con.execute("SELECT COUNT(*) FROM pages WHERE is_public = 1").fetchone()[0]
+    after_private = con.execute("SELECT COUNT(*) FROM pages WHERE is_public = 0").fetchone()[0]
+    con.close()
+
+    assert before_public == after_public, "is_public count changed after tool-use turn"
+    assert before_private == after_private
+
+
+def test_phase_10a_allowlist_blocks_bypass_attempt(vault_copy, db_path, monkeypatch):
+    """If the LLM tries to consult a path that is NOT a graph neighbor of the
+    summoned page, the handler must return is_error and the response must come
+    back as 200 (not 500)."""
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    from living_vault.core.llm import FakeLLMWithTools
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    monkeypatch.setenv("LIVING_VAULT_ROOT", str(vault_copy))
+    monkeypatch.setenv("LIVING_VAULT_DB", str(db_path))
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
+    from importlib import reload
+    from living_vault.apps.seance_ui import app as app_mod
+    reload(app_mod)
+    fake = FakeLLMWithTools([
+        {"type": "tool_use", "name": "consult_neighbor",
+         "input": {"neighbor_path": "../../../etc/passwd"}},
+        {"type": "text", "text": "I refused that."},
+    ])
+    monkeypatch.setattr(app_mod, "get_llm", lambda: fake)
+    c = TestClient(app_mod.app)
+    sid = c.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+    r = c.post("/api/say", json={"session_id": sid, "text": "try escape"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # at least one is_error event recorded for the bypass attempt
+    error_events = [
+        ev for ev in body["tool_events"]
+        if "error" in (ev.get("tool_result_summary") or {})
+    ]
+    assert len(error_events) >= 1
