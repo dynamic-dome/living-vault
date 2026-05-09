@@ -4,13 +4,14 @@ Bind: 127.0.0.1 only. No auth (local-only).
 """
 from __future__ import annotations
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
 from living_vault.core import db as db_mod
-from living_vault.core.persona import build_persona_lite
+from living_vault.core.persona import build_persona
 from living_vault.core.graph import neighbors as graph_neighbors
 from living_vault.apps.seance_ui.prompt import build_system_prompt
 from living_vault.apps.seance_ui.llm import get_llm
@@ -31,15 +32,16 @@ def _db_path() -> Path:
     return _vault_root().parent / ".vault-engine.db"
 
 
-app = FastAPI(title="séance")
-STATIC_DIR = Path(__file__).parent / "static"
-
-
-@app.on_event("startup")
-def _ensure_schema() -> None:
-    """Ensure seance tables exist — covers the case where the db was created
-    before the seance feature shipped (db.initialize is idempotent)."""
+@asynccontextmanager
+async def _lifespan(app):
+    # startup
     db_mod.initialize(_db_path())
+    yield
+    # shutdown — nothing to clean up
+
+
+app = FastAPI(title="séance", lifespan=_lifespan)
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 class SummonReq(BaseModel):
@@ -70,7 +72,7 @@ def list_pages() -> list[dict]:
 
 @app.post("/api/summon")
 def summon(req: SummonReq) -> dict:
-    persona = build_persona_lite(_vault_root(), _db_path(), req.path)
+    persona = build_persona(_vault_root(), _db_path(), req.path)
     if persona is None:
         raise HTTPException(status_code=404, detail=f"page not found: {req.path}")
     sid = store.new_session(_db_path(), page_path=req.path)
@@ -92,7 +94,7 @@ def say(req: SayReq) -> dict:
         nbs = graph_neighbors(con, page_path)
     finally:
         con.close()
-    persona = build_persona_lite(_vault_root(), _db_path(), page_path)
+    persona = build_persona(_vault_root(), _db_path(), page_path)
     if persona is None:
         raise HTTPException(status_code=410, detail="page gone since session start")
     system = build_system_prompt(persona, neighbor_titles=[Path(n).stem for n in nbs])
