@@ -165,9 +165,20 @@ def test_cap_history_drops_oldest_when_total_chars_exceed(vault_copy, db_path, m
 
 
 def test_phase_10a_no_public_leak_after_tool_use_turn(vault_copy, db_path, monkeypatch):
-    """Phase-1 privacy regression must hold after Phase-10a tool-use turns.
+    """Regression canary: pages.is_public counts must be stable across tool-use turns.
 
-    Running a turn with consult_neighbor must NOT mutate is_public on any page.
+    Phase-1 privacy posture relies on is_public being written ONLY by
+    index_vault, never by consumer code. The /api/say handler reads pages
+    (via build_persona + read_page) but must not write is_public — and
+    Phase-10a's consult_neighbor likewise only reads. This test snapshots
+    is_public counts before+after a legitimate tool-use turn and asserts
+    they are unchanged.
+
+    Caveat: the current handler implementation never touches the pages
+    table at all, so this test cannot fail under any realistic Phase-10a
+    bug. Its real value is as a canary against future drift — e.g. if
+    someone later mistakenly calls index_vault() inside the handler, or
+    starts mutating is_public from a consumer code path.
     """
     from living_vault.core import db as db_mod
     from living_vault.core.indexer import index_vault
@@ -209,9 +220,22 @@ def test_phase_10a_no_public_leak_after_tool_use_turn(vault_copy, db_path, monke
 
 
 def test_phase_10a_allowlist_blocks_bypass_attempt(vault_copy, db_path, monkeypatch):
-    """If the LLM tries to consult a path that is NOT a graph neighbor of the
-    summoned page, the handler must return is_error and the response must come
-    back as 200 (not 500)."""
+    """Security-review canary: a path-traversal-shaped payload from the LLM
+    must be rejected by the allowlist before any path resolution happens.
+
+    The handler's current logic checks `nbr not in allow` (set membership)
+    BEFORE building `vault_root / nbr`, so `../../../etc/passwd` is rejected
+    identically to any other non-neighbor — the path-traversal nature never
+    matters at this layer. This test exists alongside
+    test_say_with_non_neighbor_tool_call_records_is_error in
+    test_seance_say_with_tools.py (which uses concepts/totally-unrelated.md);
+    both prove the same allowlist invariant but with different intent:
+    the other test verifies "non-neighbor coverage", this one verifies "an
+    explicit attack-shaped payload is harmless". If the handler ever switches
+    to first-resolve-then-check (a common refactor mistake), this test would
+    still pass — but a future security review will rightly want this case
+    encoded in the test name and string content.
+    """
     from living_vault.core import db as db_mod
     from living_vault.core.indexer import index_vault
     from living_vault.core.llm import FakeLLMWithTools
