@@ -43,7 +43,7 @@
       color:#cfe;
       font-weight:bold;
     }
-    .budgetWarning{
+    .toolEvent.budgetWarning{
       border-left-color:#e80;
       color:#fc8;
     }
@@ -182,7 +182,7 @@ document.getElementById("form").onsubmit = async (ev) => {
   const r = await fetch("/api/say",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sid,text:userText})});
   const j = await r.json();
   if (Array.isArray(j.tool_events)) {
-    j.tool_events.forEach((ev, idx) => appendToolEvent(ev, idx, j.tool_events.length));
+    j.tool_events.forEach((te, idx) => appendToolEvent(te, idx, j.tool_events.length));
   }
   appendMsg("assistant", j.reply || "(no reply)");
 };
@@ -205,6 +205,11 @@ function appendToolEvent(ev, idx, total){
     const path = (ev.tool_args && ev.tool_args.neighbor_path) || "?";
     const chars = summary.chars || 0;
     d.innerHTML = `» consulted <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} chars)`;
+    // Budget warning fires for events 7..10 ONLY when the entire turn produced
+    // at most 10 events. If the soft-cap-rejection event (the 11th) made it
+    // into the batch, total is 11 and the warning is suppressed for the whole
+    // turn — by design: the explicit budget-exhausted error bubble already
+    // tells the story without doubling the visual noise on each preceding event.
     if (idx + 1 >= 7 && total <= 10){
       d.classList.add("budgetWarning");
       d.innerHTML += ` <span style="opacity:.7">— nearing budget (${idx + 1}/10)</span>`;
