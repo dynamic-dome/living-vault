@@ -11,12 +11,12 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def new_session(db_path: Path, page_path: str) -> int:
+def new_session(db_path: Path, page_path: str, mode: str = "single") -> int:
     con = db_mod.connect(db_path)
     try:
         cur = con.execute(
-            "INSERT INTO seance_sessions(page_path, started_at) VALUES (?, ?)",
-            (page_path, _now()),
+            "INSERT INTO seance_sessions(page_path, started_at, mode) VALUES (?, ?, ?)",
+            (page_path, _now(), mode),
         )
         con.commit()
         return int(cur.lastrowid)
@@ -141,5 +141,69 @@ def get_session_detail(db_path: Path, session_id: int) -> dict | None:
                 for r in msg_rows
             ],
         }
+    finally:
+        con.close()
+
+
+def add_session_persona(
+    db_path: Path,
+    session_id: int,
+    persona_path: str,
+    *,
+    color: str,
+    seat_idx: int,
+) -> None:
+    con = db_mod.connect(db_path)
+    try:
+        con.execute(
+            "INSERT INTO seance_session_personas(session_id, persona_path, color, seat_idx) "
+            "VALUES (?, ?, ?, ?)",
+            (session_id, persona_path, color, seat_idx),
+        )
+        con.commit()
+    finally:
+        con.close()
+
+
+def get_session_personas(db_path: Path, session_id: int) -> list[dict]:
+    """Return personas in seat order. Each row: {persona_path, color, seat_idx}."""
+    con = db_mod.connect(db_path)
+    try:
+        rows = con.execute(
+            "SELECT persona_path, color, seat_idx FROM seance_session_personas "
+            "WHERE session_id = ? ORDER BY seat_idx",
+            (session_id,),
+        ).fetchall()
+        return [
+            {"persona_path": r["persona_path"], "color": r["color"], "seat_idx": r["seat_idx"]}
+            for r in rows
+        ]
+    finally:
+        con.close()
+
+
+def count_user_turns(db_path: Path, session_id: int) -> int:
+    """How many user-role messages exist in this session."""
+    con = db_mod.connect(db_path)
+    try:
+        row = con.execute(
+            "SELECT COUNT(*) FROM seance_messages "
+            "WHERE session_id = ? AND role = 'user'",
+            (session_id,),
+        ).fetchone()
+        return int(row[0])
+    finally:
+        con.close()
+
+
+def get_session_mode(db_path: Path, session_id: int) -> str | None:
+    """Return the mode of a session, or None if session not found."""
+    con = db_mod.connect(db_path)
+    try:
+        row = con.execute(
+            "SELECT mode FROM seance_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        return row["mode"] if row else None
     finally:
         con.close()

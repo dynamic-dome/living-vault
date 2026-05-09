@@ -133,3 +133,61 @@ def test_get_history_filters_tool_use(db_path):
     detail = store.get_session_detail(db_path, sid)
     roles_in_detail = [m["role"] for m in detail["messages"]]
     assert "tool_use" in roles_in_detail
+
+
+def test_new_session_persists_mode(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md", mode="freeforall")
+    # mode is persisted in seance_sessions
+    import sqlite3
+    con = sqlite3.connect(str(db_path))
+    row = con.execute("SELECT mode FROM seance_sessions WHERE id = ?", (sid,)).fetchone()
+    con.close()
+    assert row[0] == "freeforall"
+
+
+def test_new_session_default_mode_is_single(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")  # no mode kwarg
+    import sqlite3
+    con = sqlite3.connect(str(db_path))
+    row = con.execute("SELECT mode FROM seance_sessions WHERE id = ?", (sid,)).fetchone()
+    con.close()
+    assert row[0] == "single"
+
+
+def test_add_and_get_session_personas(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/a.md", mode="roundrobin")
+    store.add_session_persona(db_path, sid, "concepts/a.md", color="#7adfd5", seat_idx=0)
+    store.add_session_persona(db_path, sid, "concepts/b.md", color="#a8e6cf", seat_idx=1)
+    store.add_session_persona(db_path, sid, "concepts/c.md", color="#c9b3ff", seat_idx=2)
+
+    rows = store.get_session_personas(db_path, sid)
+    assert len(rows) == 3
+    # ordered by seat_idx
+    assert rows[0]["persona_path"] == "concepts/a.md"
+    assert rows[0]["color"] == "#7adfd5"
+    assert rows[0]["seat_idx"] == 0
+    assert rows[1]["persona_path"] == "concepts/b.md"
+    assert rows[2]["seat_idx"] == 2
+
+
+def test_count_user_turns(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")
+    assert store.count_user_turns(db_path, sid) == 0
+    store.add_message(db_path, sid, "user", "first")
+    assert store.count_user_turns(db_path, sid) == 1
+    store.add_message(db_path, sid, "assistant", "reply", persona_path="concepts/x.md")
+    assert store.count_user_turns(db_path, sid) == 1  # assistants don't count
+    store.add_message(db_path, sid, "user", "second")
+    assert store.count_user_turns(db_path, sid) == 2
