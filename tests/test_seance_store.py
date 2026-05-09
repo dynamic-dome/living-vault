@@ -3,6 +3,7 @@ from living_vault.core import db as db_mod
 from living_vault.apps.seance_ui.store import (
     new_session, add_message, get_history, list_sessions,
 )
+import json
 
 
 def test_new_session_returns_id(db_path: Path):
@@ -52,13 +53,83 @@ def test_get_session_detail_returns_messages(db_path: Path):
     detail = get_session_detail(db_path, sid)
     assert detail is not None
     assert detail["page_path"] == "concepts/note-a.md"
-    assert detail["messages"] == [
-        {"role": "user", "content": "wer bist du?"},
-        {"role": "assistant", "content": "ich bin note-a"},
-    ]
+    msgs = detail["messages"]
+    assert len(msgs) == 2
+    assert msgs[0]["role"] == "user"
+    assert msgs[0]["content"] == "wer bist du?"
+    assert msgs[1]["role"] == "assistant"
+    assert msgs[1]["content"] == "ich bin note-a"
 
 
 def test_get_session_detail_unknown_returns_none(db_path: Path):
     from living_vault.apps.seance_ui.store import get_session_detail
     db_mod.initialize(db_path)
     assert get_session_detail(db_path, 9999) is None
+
+
+def test_add_message_persists_persona_path(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")
+    store.add_message(db_path, sid, "assistant", "hi", persona_path="concepts/x.md")
+    detail = store.get_session_detail(db_path, sid)
+    msg = detail["messages"][0]
+    assert msg["role"] == "assistant"
+    assert msg["persona_path"] == "concepts/x.md"
+
+
+def test_add_message_persona_path_defaults_to_none(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")
+    store.add_message(db_path, sid, "user", "hello")  # no persona_path
+    detail = store.get_session_detail(db_path, sid)
+    assert detail["messages"][0]["persona_path"] is None
+
+
+def test_add_tool_event_writes_role_tool_use(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")
+    store.add_tool_event(
+        db_path,
+        sid,
+        persona_path="concepts/x.md",
+        tool_name="consult_neighbor",
+        tool_args={"neighbor_path": "concepts/y.md"},
+        tool_result_summary={"chars": 1500, "title": "Y"},
+    )
+    detail = store.get_session_detail(db_path, sid)
+    assert len(detail["messages"]) == 1
+    m = detail["messages"][0]
+    assert m["role"] == "tool_use"
+    assert m["persona_path"] == "concepts/x.md"
+    payload = json.loads(m["content"])
+    assert payload["tool_name"] == "consult_neighbor"
+    assert payload["tool_args"]["neighbor_path"] == "concepts/y.md"
+    assert payload["tool_result_summary"]["chars"] == 1500
+
+
+def test_get_history_filters_tool_use(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    sid = store.new_session(db_path, "concepts/x.md")
+    store.add_message(db_path, sid, "user", "u1")
+    store.add_tool_event(
+        db_path, sid, persona_path="concepts/x.md",
+        tool_name="consult_neighbor",
+        tool_args={"neighbor_path": "concepts/y.md"},
+        tool_result_summary={"chars": 100},
+    )
+    store.add_message(db_path, sid, "assistant", "a1", persona_path="concepts/x.md")
+    history = store.get_history(db_path, sid)
+    # tool_use must NOT appear in replay history
+    assert history == [("user", "u1"), ("assistant", "a1")]
+    # but full detail still has it
+    detail = store.get_session_detail(db_path, sid)
+    roles_in_detail = [m["role"] for m in detail["messages"]]
+    assert "tool_use" in roles_in_detail
