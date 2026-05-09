@@ -50,6 +50,7 @@ def respond(llm: LLM, system: str, history: list[tuple[str, str]]) -> str:
 
 
 def get_llm() -> LLM:
-    if os.environ.get("LIVING_VAULT_FAKE_LLM"):
+    flag = os.environ.get("LIVING_VAULT_FAKE_LLM", "").strip().lower()
+    if flag and flag not in ("0", "false", "no"):
         return FakeLLM()
     return AnthropicLLM()
