@@ -40,7 +40,12 @@ ROUNDTABLE_MODES = frozenset({"roundrobin", "moderator", "freeforall"})
 def hash_color(persona_path: str) -> str:
     """Deterministic color from path. Same path always gets same color
     across processes (Python's built-in hash() is randomized by default
-    since 3.3, so we use a stable cheap alternative)."""
+    since 3.3, so we use a stable cheap alternative).
+
+    MIRROR: living_vault/apps/seance_ui/static/index.html `hashColorJs()`
+    must use the same PALETTE order and the same sum-of-char-codes hash,
+    otherwise historical session replays show different colors than live
+    sessions. If you change PALETTE here, update both."""
     h = sum(ord(c) for c in persona_path)
     return PALETTE[h % len(PALETTE)]
 

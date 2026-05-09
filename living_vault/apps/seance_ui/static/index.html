@@ -112,6 +112,13 @@ async function loadPages(){
     const d = document.createElement("div"); d.className="pageItem";
     d.textContent = p.path;
     d.dataset.path = p.path;
+    // Reapply visual selection state — the Set survives loadPages re-renders,
+    // but the DOM is wiped, so without this we'd silently lose the .selected
+    // class on tab-switch-back even though the Set still has the path.
+    if (selectedPaths.has(p.path)) d.classList.add("selected");
+    // Note: click fires twice before dblclick on a double-click (toggle in,
+    // toggle out), then dblclick clears selection and runs legacy summon —
+    // brief visual flicker is harmless.
     d.onclick = () => togglePageSelection(p.path, d);
     d.ondblclick = () => singleSummonOnDoubleClick(p.path);
     el.appendChild(d);
@@ -123,19 +130,12 @@ function togglePageSelection(path, el){
   if (selectedPaths.has(path)){
     selectedPaths.delete(path);
     el.classList.remove("selected");
+  } else if (selectedPaths.size >= 8){
+    toast("max 8 personas per roundtable");
+    return;
   } else {
-    if (selectedPaths.size === 0){
-      // First selection: still allow single-summon shortcut on single click
-      // by keeping the legacy summon path available. Track selection visually.
-      selectedPaths.add(path);
-      el.classList.add("selected");
-    } else if (selectedPaths.size >= 8){
-      toast("max 8 personas per roundtable");
-      return;
-    } else {
-      selectedPaths.add(path);
-      el.classList.add("selected");
-    }
+    selectedPaths.add(path);
+    el.classList.add("selected");
   }
   updateModeRow();
 }
@@ -166,11 +166,20 @@ async function summonRoundtable(){
     if (!ok) return;
   }
 
-  const r = await fetch("/api/summon", {
-    method:"POST",
-    headers:{"content-type":"application/json"},
-    body: JSON.stringify({paths, mode}),
-  });
+  // Disable the summon button during the in-flight request to prevent
+  // accidental duplicate submissions on a rapid double-click.
+  const btn = document.getElementById("summonBtn");
+  btn.disabled = true;
+  let r;
+  try {
+    r = await fetch("/api/summon", {
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body: JSON.stringify({paths, mode}),
+    });
+  } finally {
+    btn.disabled = false;
+  }
   if (!r.ok){ toast("summon failed: " + r.status); return; }
   const j = await r.json();
   sid = j.session_id;
