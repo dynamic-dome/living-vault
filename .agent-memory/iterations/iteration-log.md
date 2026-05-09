@@ -89,3 +89,35 @@ Restschuld nach Final-Review:
 ### Errors
 
 (keine echten Bugs in finaler Code-Base — alle Quality-Items im Cross-Review-Loop als Tightening-Commits adressiert)
+
+
+## Iteration #4 — 2026-05-09 18:30
+
+**Type:** feature
+**Summary:** Phase 11 (synesthesia public subset) komplett implementiert mit Allowlist-Layer, Public-Build-CLI, 3D-Brand-Header, Deploy-Skript und positiver User-Sichtprüfung gegen 953-Page-Real-DB
+**Files changed:** living_vault/core/privacy.py (allowlist API: public_pages mit Union, load_allowlist, allowlist_skipped), living_vault/apps/synesthesia/layout.py (compute_layout +allowlist Param + PCA-Pad-Fix für n<3), living_vault/apps/synesthesia/render.py (public_build + public_build_cli @click.command, render_html +**extra_ctx), living_vault/apps/synesthesia/templates/vault-3d.html.j2 (Brand-Header + Footer in {% if embed_url %}-Block), pyproject.toml (synesthesia-public-build entry point), tests/test_privacy.py (+5 Tests), tests/test_privacy_regression.py (+3 Tests), tests/test_synesthesia_render.py (+6 Tests), scripts/deploy-public-vault.ps1 (NEU), docs/superpowers/specs/2026-05-09-phase-11-public-vault-design.md (NEU), docs/superpowers/plans/2026-05-09-phase-11-public-vault.md (NEU), docs/PHASE-11-CHECKLIST.md (NEU), docs/DEPLOY-PUBLIC-VAULT.md (NEU), docs/public-allowlist.txt (NEU mit 10 kuratierten Pages), docs/plans/2026-05-08-living-vault-master-plan.md (Phase-11-Status)
+**Tests:** passed (218 passed, war 204 vor Phase 11, +14)
+**Confidence:** 5/5
+**Tags:** python, fastapi, click, jinja2, pca, sqlite, privacy-boundary, allowlist, manifest-schema, deterministic-build, deploy-pipeline, schema-stability, tdd, subagent-driven, live-smoke, codex-verifier
+
+### Details
+
+Master-Plan-Phase-11 vollständig durchgezogen. 6 Sub-Tasks via subagent-driven-development mit fresh subagent + Codex-Verifier-Default nach jedem Task. 9 Commits gesamt (1 Spec+Plan + 1 Allowlist-Layer + 1 PCA-Pad-Fix + 1 Privacy-Regression + 1 Public-Build-CLI + 1 Brand-Header + 1 Deploy-Skript + 1 Acceptance-Checklist + 1 Final-Close). Architektur: Allowlist als runtime-Filter (kein DB-Schema-Eingriff), `public_pages(con, allowlist=None)` liefert Union via SQL `WHERE is_public=1 OR path IN (...)`, `compute_layout` rückwärts-kompatibel mit Default `allowlist=None`. Neue Click-Command `public_build_cli` als standalone @click.command (NICHT subcommand) zur Backwards-Compat des bestehenden `synesthesia`-Entry-Points. Manifest-Schema v1 mit 14 Feldern (build_at als einzige zeitabhängige Variable). Determinismus-Test relaxed: index.html modulo build-stamp-lines (Build/Stand), pages.json byte-identisch.
+
+Codex-Verifier-Pass nach Task 11.1 lieferte 1 LOW-Finding (SQLite IN-Clause-Parameter-Limit ~999) — als Phase-11-Carry-Over geparkt, in der Praxis irrelevant für kuratierte Allowlists.
+
+User-Sichtprüfung 2026-05-09 in 4 Stages durchlaufen: (1) frontmatter-only build → public_total=0 plausibel; (2) allowlist-curated build mit 10 Pages → public_total=10, edges_total=4 (drei Cluster: MCP/Agentic, Living-Vault-Meta, Mikromagnetik); (3) 3D-Vault-Render mit 10 Knoten + 4 Edges sichtbar; (4) Privacy-Filter hält. User-Verdikt: "okay, also geht" → Master-Plan-Row 11 ✅.
+
+### Learnings
+
+- **Privacy-Boundaries müssen über die Test-Suite explizit verteidigt werden, nicht nur im Code-Pfad**: Phase 11 hat 6 dedizierte Privacy-Tests (5 union-Logik + 3 regression + edge-isolation). Der bestehende `test_no_private_path_in_public_synesthesia_build` aus Phase 7 wurde nicht angefasst, sondern die neue Allowlist-Variante daneben gestellt. Layered defense gegen privacy drift.
+- **`render_html` mit `**extra_ctx` durchreichen ist eine elegante Backwards-Compat-Lösung für Template-Variablen**: Statt die Funktion-Signature mit 6 neuen Optional-Args aufzublähen, akzeptiert sie `**extra_ctx` und reicht alles ans Jinja2-Template weiter. Templates die die Vars nicht referenzieren ignorieren sie. Legacy-Renders bleiben byte-identisch (verifiziert durch bestehenden render-Test).
+- **Click-Subcommand-vs-standalone-Entscheidung muss früh stehen**: Click hat zwei mutually exclusive Patterns: `@click.group()` mit Subcommands oder `@click.command()` standalone. Sobald ein @click.command als Entry-Point registriert ist, kann es nicht mehr ohne Breaking-Change in eine Group umgewandelt werden. Phase-11 hat das durch zwei separate Entry-Points (`synesthesia` + `synesthesia-public-build`) gelöst, beide als standalone @click.command. Das war im Plan als explizite "Variante B" notiert.
+- **PCA-SVD-Component-Count = `min(n_samples, n_features)` ist eine subtile Falle bei kleinen Test-Fixtures**: Beim Schreiben der Privacy-Regression-Tests (vault_copy mit 2 allowlisted Pages) crashte `_pca_3d` mit `IndexError` auf `c[2]`, weil SVD nur 2 Komponenten lieferte. Production-Vaults mit >>3 Pages waren nie betroffen — Fix war minimal (Zero-Padding bei <3 Spalten), aber der Bug wäre ohne Test-Edge-Case nie aufgefallen. Lesson: Tests mit minimalen Fixtures finden Bugs, die produktive Daten verstecken.
+- **Brand-Header in `{% if embed_url %}` halten Legacy-Renders byte-identisch**: Phase 11 fügt Header/Footer-CSS+HTML zum Default-Template, aber ohne dass `embed_url` (oder die anderen vars) gesetzt sind, rendert das Template wie vorher. Bestehender `synesthesia` low-level CLI ist unangetastet. Das ist die richtige Strategie wenn ein Template multiple Use-Cases bedienen muss (low-level dev vs deploy-bundle).
+- **Determinismus-Tests müssen Time-Variables explizit ausnehmen, nicht naiv byte-vergleichen**: Erste Implementierung von `test_public_build_is_deterministic` schlug fehl, weil das Template `{{ build_at }}` und `{{ build_date }}` rendert. Lösung: `_strip_buildstamp(text)` filtert Zeilen mit "Build " oder "Stand " bevor verglichen wird. Manifest darf `build_at` differieren, alle anderen Felder müssen identisch sein. Test wurde explizit "modulo_build_at" benannt.
+- **Bridge-Pages haben überproportional viel Edge-Wert in einem Subset-Render**: Erste 10-Page-Allowlist produzierte nur 4 Edges, weil die meisten Wikilinks der 10 Pages auf nicht-allowlisted Pages zeigten (`model-context-protocol`, `magnetische-hysterese` etc.). Lesson: Beim Kuratieren von Public-Subsets erst Bridge-Pages identifizieren (Pages die mehrfach von der Subset-Auswahl verlinkt werden), nicht nur Themen-Cluster picken.
+
+### Errors
+
+(keine echten Bugs in finaler Code-Base — der PCA-Pad-Fix war eine Edge-Case-Vorsorge ohne production-Auswirkung, der Codex-Verifier-LOW-Befund SQLite-IN-Limit ist theoretisch ohne praktischen Trigger, alle Quality-Items im Cross-Review-Loop adressiert)
