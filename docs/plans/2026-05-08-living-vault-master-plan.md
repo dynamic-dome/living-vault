@@ -44,7 +44,8 @@
 | 7 | Phase-1-Integration & Polish | End-to-End-Test, Privacy-Test-Suite, Doku, Acceptance-Checklist | ✅ |
 | 8 | **Phase-1-Abschluss-Gate** | User-Review aller drei Linsen, Entscheidung: Phase 2 starten oder pausieren | ✅ |
 | 9 | (Phase 2) core/persona.py — Schicht 3 Persona-Vollausbau | persona.py, voice-extraction, era-marker | ✅ |
-| 10 | (Phase 2) Nachbar-Gespräche (Stufe 2 + 3) | `consult_neighbor` Tool-Use + Multi-Persona-Roundtable + Mode-Toggle | 🟡 |
+| 10a | (Phase 2) Nachbar-Gespräche Stufe 2 (Pull-on-Demand) | `consult_neighbor` Tool-Use + Allowlist + Soft-Cap + UI-Mini-Bubbles + Sichtprüfungs-Hotfix | ✅ |
+| 10b | (Phase 2) Nachbar-Gespräche Stufe 3 (Multi-Persona-Roundtable) | Multi-Select Pages + 3 Modi (Round-Robin / Moderator / Free-for-all) + UI-Bubbles mit Persona-Label | 🟡 |
 | 11 | (Phase 2) synesthesia public subset + portfolio 3D-Embed | --public-only Modus, Privacy-Tests, Site-Embed | ⏳ |
 | 12 | (Phase 2) séance MCP-Tool + commit_insight | seance.summon, seance.commit_insight, Multi-Page-Modus | ⏳ |
 | 13 | (Phase 2) Version-History-Modal in living-portfolio | Git-Backed Page-History-API, Modal-UI | ⏳ |
@@ -134,4 +135,4 @@ Wer in dieses Projekt einsteigt, sollte zuerst:
 4. `~/wiki/wiki/synthesis/2026-05-08-mcp-ideen-genese-notebooklm.md` für Hintergrund (warum diese drei Tools)
 5. Status-Symbole in Phasen-Tabelle ernst nehmen — wer ⏳ überspringt, bricht das Fundament
 
-Aktuelle Position: **Phase 8 + 9 ✅ abgeschlossen am 2026-05-09**. **Phase 10a (Stufe 2 = consult_neighbor Pull-on-Demand) code-complete am 2026-05-09**, Live-Sichtprüfung steht aus (siehe `docs/PHASE-10A-CHECKLIST.md`). 154 Tests grün (Phase 9 endete bei 118, +36 für Phase-10a). Schema-Migration `seance_messages.persona_path` idempotent gegen Live-DB verifiziert. Phase 10b (Stufe 3 Multi-Persona-Roundtable) bekommt eigenes Spec/Plan-Cycle nach Sichtprüfung. Phase 11 = Synesthesia public subset (war ursprünglich Phase 10, durch User-Pick 2026-05-09: B → A verschoben).
+Aktuelle Position: **Phase 8 + 9 ✅ abgeschlossen am 2026-05-09**. **Phase 10a ✅ abgeschlossen am 2026-05-09 inkl. Live-Sichtprüfung positiv** (siehe `docs/PHASE-10A-CHECKLIST.md`). 156 Tests grün (Phase 9 endete bei 118, +38 für Phase-10a inkl. Hotfix). Schema-Migration `seance_messages.persona_path` idempotent gegen Live-DB. Sichtprüfungs-Hotfix `90120ea` legte volle Nachbar-Pfade in den System-Prompt — Persona ruft `consult_neighbor` jetzt mit echten relpaths auf. **Phase 10b 🟡 in Arbeit ab 2026-05-09**: Stufe 3 Multi-Persona-Roundtable. Phase 11 = Synesthesia public subset.
