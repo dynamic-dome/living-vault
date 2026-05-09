@@ -102,7 +102,6 @@ def say(req: SayReq) -> dict:
             detail=f"text too long ({len(req.text)} chars, max {_MAX_USER_TEXT_CHARS})",
         )
     history = store.get_history(_db_path(), req.session_id)
-    # find the page for this session
     con = db_mod.connect(_db_path())
     try:
         row = con.execute(
@@ -114,19 +113,67 @@ def say(req: SayReq) -> dict:
         nbs = graph_neighbors(con, page_path)
     finally:
         con.close()
+
     persona = build_persona(_vault_root(), _db_path(), page_path)
     if persona is None:
         raise HTTPException(status_code=410, detail="page gone since session start")
     system = build_system_prompt(persona, neighbor_titles=[Path(n).stem for n in nbs])
 
-    history.append(("user", req.text))
-    history = _cap_history(history)
-    llm = get_llm()
-    reply = llm.respond(system=system, history=history)
+    # Persist user turn first so it's in DB even if the LLM call fails.
+    store.add_message(_db_path(), req.session_id, "user", req.text, persona_path=None)
 
-    store.add_message(_db_path(), req.session_id, "user", req.text)
-    store.add_message(_db_path(), req.session_id, "assistant", reply)
-    return {"reply": reply}
+    # Build the tool-use loop infrastructure.
+    from living_vault.apps.seance_ui.neighbors import (
+        CONSULT_NEIGHBOR_TOOL_DEF,
+        make_consult_neighbor_handler,
+    )
+    raw_handler = make_consult_neighbor_handler(
+        vault_root=_vault_root(),
+        db_path=_db_path(),
+        session_id=req.session_id,
+        persona_path=page_path,
+        allowlist=set(nbs),
+    )
+
+    tool_events: list[dict] = []
+
+    def handler_with_capture(name: str, args: dict):
+        result = raw_handler(name, args)
+        # Capture every call (success or is_error) for the response.
+        if isinstance(result, dict) and result.get("is_error"):
+            tool_events.append({
+                "tool_name": name,
+                "tool_args": args,
+                "tool_result_summary": {"error": result["content"]},
+            })
+        else:
+            # Successful call — pull the matching summary from the DB row we just wrote.
+            tool_events.append({
+                "tool_name": name,
+                "tool_args": args,
+                "tool_result_summary": {"chars": len(result) if isinstance(result, str) else 0},
+            })
+        return result
+
+    history_for_llm = list(history) + [("user", req.text)]
+    history_for_llm = _cap_history(history_for_llm)
+
+    llm = get_llm()
+    if hasattr(llm, "respond_with_tools"):
+        reply = llm.respond_with_tools(
+            system=system,
+            history=history_for_llm,
+            tools=[CONSULT_NEIGHBOR_TOOL_DEF],
+            tool_handler=handler_with_capture,
+            max_iterations=5,
+        )
+    else:
+        reply = llm.respond(system=system, history=history_for_llm)
+
+    store.add_message(
+        _db_path(), req.session_id, "assistant", reply, persona_path=page_path
+    )
+    return {"reply": reply, "tool_events": tool_events}
 
 
 @app.get("/api/sessions")
