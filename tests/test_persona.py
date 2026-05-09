@@ -57,7 +57,7 @@ def test_build_persona_caches_voice_features_in_db(vault_copy: Path, db_path: Pa
     assert "avg_sentence_length" in cached
 
 
-def test_build_persona_uses_cached_voice_features_when_hash_unchanged(
+def test_build_persona_uses_cached_voice_features_from_db(
     vault_copy: Path, db_path: Path
 ):
     """Second call must read voice_features from DB, not recompute."""

@@ -44,14 +44,12 @@ def assemble_persona(
     }
 
 
-def _load_voice_features_from_db(con, path: str) -> Optional[dict]:
-    row = con.execute(
-        "SELECT voice_features FROM pages WHERE path = ?", (path,)
-    ).fetchone()
-    if row is None or row["voice_features"] is None:
+def _parse_voice_features(blob: Optional[str]) -> Optional[dict]:
+    """Deserialize the voice_features TEXT column. Returns None for missing/corrupt."""
+    if blob is None:
         return None
     try:
-        return json.loads(row["voice_features"])
+        return json.loads(blob)
     except json.JSONDecodeError:
         return None
 
@@ -64,13 +62,6 @@ def _store_voice_features(con, path: str, features: dict) -> None:
     con.commit()
 
 
-def _load_voice_distilled_from_db(con, path: str) -> Optional[str]:
-    row = con.execute(
-        "SELECT voice_distilled FROM pages WHERE path = ?", (path,)
-    ).fetchone()
-    return row["voice_distilled"] if row is not None else None
-
-
 def build_persona(
     vault_root: Path, db_path: Path, relpath: str
 ) -> Optional[dict]:
@@ -78,7 +69,9 @@ def build_persona(
     con = db_mod.connect(db_path)
     try:
         row = con.execute(
-            "SELECT path, frontmatter FROM pages WHERE path = ?", (relpath,)
+            "SELECT path, frontmatter, voice_features, voice_distilled "
+            "FROM pages WHERE path = ?",
+            (relpath,),
         ).fetchone()
         if row is None:
             return None
@@ -88,12 +81,12 @@ def build_persona(
         body_excerpt = (page.body or "").strip()[:_BODY_EXCERPT_CHARS]
 
         # voice_features: try cache; if absent, extract on-demand and persist
-        voice_features = _load_voice_features_from_db(con, relpath)
+        voice_features = _parse_voice_features(row["voice_features"])
         if voice_features is None:
             voice_features = extract_stylometric(page.body or "")
             _store_voice_features(con, relpath, voice_features)
 
-        voice_distilled = _load_voice_distilled_from_db(con, relpath)
+        voice_distilled = row["voice_distilled"]
 
         return assemble_persona(
             path=relpath,
