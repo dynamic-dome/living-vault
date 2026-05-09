@@ -9,6 +9,18 @@ calls with (tool_name, tool_args). The closure:
   5. Returns either a string (the excerpt) or a dict {is_error, content}.
 
 The LLM-loop in core.llm.respond_with_tools handles both return shapes.
+
+Persistence asymmetry (intentional):
+  - Allowlist rejection, missing-arg, soft-cap budget exhaustion → NO DB write.
+    These are client-validation errors that fire before any real tool work; we
+    don't want the LLM-loop to spam tool-event rows by hammering bad paths.
+  - Missing file, read_page exception → DB write WITH error summary.
+    The tool was legitimately invoked and reached the page-fetch layer;
+    persisting the failure keeps sessions reproducible and the UI-mini-bubble
+    can show the user what happened.
+  - Successful excerpt → DB write WITH success summary, counter incremented.
+    Counter increments only on success — failed file reads do NOT consume
+    budget (cheap, since they don't burn API tokens).
 """
 from __future__ import annotations
 from pathlib import Path
@@ -84,7 +96,7 @@ def make_consult_neighbor_handler(
                 db_path, session_id,
                 persona_path=persona_path,
                 tool_name=tool_name,
-                tool_args=tool_args,
+                tool_args={"neighbor_path": nbr},
                 tool_result_summary={"error": "page no longer exists"},
             )
             return {"is_error": True, "content": "page no longer exists"}
@@ -96,7 +108,7 @@ def make_consult_neighbor_handler(
                 db_path, session_id,
                 persona_path=persona_path,
                 tool_name=tool_name,
-                tool_args=tool_args,
+                tool_args={"neighbor_path": nbr},
                 tool_result_summary={"error": f"could not read page: {type(e).__name__}"},
             )
             return {"is_error": True, "content": "could not read page"}
@@ -109,7 +121,7 @@ def make_consult_neighbor_handler(
             db_path, session_id,
             persona_path=persona_path,
             tool_name=tool_name,
-            tool_args=tool_args,
+            tool_args={"neighbor_path": nbr},
             tool_result_summary={
                 "chars": len(excerpt),
                 "title": page.title,

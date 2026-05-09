@@ -2,7 +2,6 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-import pytest
 
 from living_vault.core import db as db_mod
 from living_vault.core.indexer import index_vault
