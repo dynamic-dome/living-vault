@@ -253,11 +253,18 @@ def say(req: SayReq) -> dict:
 
 
 def roundtable_say(req: SayReq) -> dict:
-    """Orchestrate a multi-persona turn for roundrobin/moderator/freeforall sessions."""
+    """Orchestrate a multi-persona turn for roundrobin/moderator/freeforall sessions.
+
+    Edge case: if all speakers' build_persona returns None (every page gone since
+    summon), the response is `{"replies": [], "tool_events": [...persona_skipped...]}`
+    with HTTP 200 — partial-failure is acceptable, no participant means no answers.
+    """
     personas = store.get_session_personas(_db_path(), req.session_id)
     if not personas:
         raise HTTPException(status_code=410, detail="session has no participants")
 
+    # re-fetch mode for self-containedness — say() already checked, but this
+    # makes roundtable_say testable standalone.
     mode = store.get_session_mode(_db_path(), req.session_id)
     turn_idx = store.count_user_turns(_db_path(), req.session_id)  # 0-indexed for THIS upcoming turn
 
@@ -274,7 +281,10 @@ def roundtable_say(req: SayReq) -> dict:
     replies: list[dict] = []
     tool_events: list[dict] = []
 
-    persona_paths = {p["persona_path"] for p in personas}
+    # Use a list (not a set) so teammate_paths order is deterministic — set
+    # iteration order is non-deterministic across runs and would make the
+    # system prompt unstable for snapshot testing.
+    persona_paths_ordered = [p["persona_path"] for p in personas]
 
     for speaker in speakers:
         speaker_path = speaker["persona_path"]
@@ -295,7 +305,7 @@ def roundtable_say(req: SayReq) -> dict:
             nbs = graph_neighbors(con, speaker_path)
         finally:
             con.close()
-        teammate_paths = [p for p in persona_paths if p != speaker_path]
+        teammate_paths = [p for p in persona_paths_ordered if p != speaker_path]
 
         system = build_system_prompt(
             persona_data,
