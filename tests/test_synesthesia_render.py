@@ -90,19 +90,19 @@ def test_public_build_manifest_has_required_fields(vault_copy: Path, tmp_path: P
 
     manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
 
-    # schema_version
-    assert manifest["schema_version"] == 1
+    # schema_version: bumped to 2 in Phase 13 (additive history_included field).
+    assert manifest["schema_version"] == 2
 
     # build_at: UTC ISO8601 "YYYY-MM-DDTHH:MM:SSZ"
     assert re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", manifest["build_at"]), \
         f"build_at format unexpected: {manifest['build_at']}"
 
-    # Required keys
+    # Required keys (history_included added in Phase 13).
     required_keys = [
         "schema_version", "build_at", "vault_root", "vault_total_pages",
         "public_via_frontmatter", "public_via_allowlist", "public_total",
         "allowlist_path", "allowlist_skipped", "edges_total", "variant",
-        "embed_url", "build_tool", "engine_version",
+        "embed_url", "history_included", "build_tool", "engine_version",
     ]
     for key in required_keys:
         assert key in manifest, f"Missing manifest key: {key}"
@@ -227,6 +227,85 @@ def test_public_build_html_has_branding_header(vault_copy: Path, tmp_path: Path)
     assert "vault.dynamic-dome.com" in html
     assert "öffentliche Pages aus" in html
     assert "schema v1" in html
+
+
+def test_public_build_writes_history_json_by_default(vault_copy: Path, tmp_path: Path):
+    """Phase-13.3: history.json is created by default. vault_copy is not a git repo,
+    so the per-page history is empty — but the file must exist and have valid schema."""
+    db = _setup_db(vault_copy, tmp_path)
+    out_dir = tmp_path / "out"
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        ["--vault", str(vault_copy), "--db", str(db), "--out", str(out_dir)],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+    assert (out_dir / "history.json").exists()
+    history = json.loads((out_dir / "history.json").read_text(encoding="utf-8"))
+    assert history["schema"] == 1
+    assert "built_at" in history
+    assert "pages" in history
+    assert isinstance(history["pages"], dict)
+    # vault_copy isn't a git repo, so each page → []
+    for v in history["pages"].values():
+        assert v == []
+
+
+def test_public_build_no_history_flag_skips_history_json(vault_copy: Path, tmp_path: Path):
+    """Phase-13.3: --no-history skips writing history.json and sets manifest flag."""
+    db = _setup_db(vault_copy, tmp_path)
+    out_dir = tmp_path / "out"
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        ["--vault", str(vault_copy), "--db", str(db), "--out", str(out_dir),
+         "--no-history"],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+    assert not (out_dir / "history.json").exists()
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["history_included"] is False
+
+
+def test_public_build_history_with_real_git_repo(tmp_path: Path):
+    """Phase-13.3: with a real git repo as vault_root, history.json contains commits."""
+    import shutil, subprocess
+    if shutil.which("git") is None:
+        import pytest as _pt; _pt.skip("git not on PATH")
+
+    # Build a tiny vault that's also a git repo with one public page.
+    repo = tmp_path / "wiki"
+    repo.mkdir()
+    page = repo / "concepts" / "p.md"
+    page.parent.mkdir(parents=True)
+    page.write_text("---\npublic: true\ntitle: P\n---\nbody\n", encoding="utf-8")
+    for cmd in (
+        ["git", "-C", str(repo), "init", "-q", "-b", "main"],
+        ["git", "-C", str(repo), "config", "--local", "user.email", "t@e.com"],
+        ["git", "-C", str(repo), "config", "--local", "user.name", "T"],
+        ["git", "-C", str(repo), "config", "--local", "commit.gpgsign", "false"],
+        ["git", "-C", str(repo), "add", "concepts/p.md"],
+        ["git", "-C", str(repo), "commit", "-q", "-m", "first commit"],
+    ):
+        subprocess.run(cmd, check=True, capture_output=True)
+
+    db = tmp_path / ".vault-engine.db"
+    db_mod.initialize(db)
+    index_vault(repo, db)
+    index_embeddings(repo, db)
+
+    out_dir = tmp_path / "out"
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        ["--vault", str(repo), "--db", str(db), "--out", str(out_dir)],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+
+    history = json.loads((out_dir / "history.json").read_text(encoding="utf-8"))
+    rows = history["pages"]["concepts/p.md"]
+    assert len(rows) == 1
+    assert rows[0]["subject"] == "first commit"
 
 
 def test_public_build_html_uses_custom_embed_url(vault_copy: Path, tmp_path: Path):

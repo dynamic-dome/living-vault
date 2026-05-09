@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from living_vault.apps.synesthesia.layout import compute_layout
 from living_vault.core import db as db_mod
 from living_vault.core.privacy import load_allowlist, allowlist_skipped, public_pages
+from living_vault.core import history as history_mod
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -62,6 +63,7 @@ def public_build(
     out_dir: Path,
     variant: str = "default",
     embed_url: str = "https://vault.dynamic-dome.com",
+    include_history: bool = True,
 ) -> dict:
     """Build a deploy-ready public-vault bundle.
 
@@ -120,6 +122,7 @@ def public_build(
         build_date=build_date,
         build_at=build_at,
         schema_version=1,
+        include_history=include_history,
     )
 
     # Count edges from rendered layout (re-use layout call)
@@ -143,9 +146,26 @@ def public_build(
         encoding="utf-8",
     )
 
-    # Build manifest
+    # Build history.json (Phase 13). One subprocess git-log call per public page;
+    # cache TTL is irrelevant during a single build run since each path is fetched once.
+    if include_history:
+        history_mod.clear_cache()
+        history_data = {
+            "schema": 1,
+            "built_at": build_at,
+            "pages": {
+                p: history_mod.page_history(vault_root, p, limit=10)
+                for p in all_public
+            },
+        }
+        (out_dir / "history.json").write_text(
+            json.dumps(history_data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    # Build manifest. schema_version=2 introduces history_included.
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "build_at": build_at,
         "vault_root": str(vault_root),
         "vault_total_pages": vault_total_pages,
@@ -157,6 +177,7 @@ def public_build(
         "edges_total": edges_total,
         "variant": variant,
         "embed_url": embed_url,
+        "history_included": include_history,
         "build_tool": "living_vault.apps.synesthesia public-build",
         "engine_version": "0.1.0",
     }
@@ -194,6 +215,7 @@ def cli(db: str, output: str, public_only: bool, variant: str) -> None:
     default="default",
 )
 @click.option("--embed-url", default="https://vault.dynamic-dome.com")
+@click.option("--no-history", is_flag=True, help="Skip writing history.json")
 def public_build_cli(
     vault: str,
     db: str,
@@ -201,6 +223,7 @@ def public_build_cli(
     out: str,
     variant: str,
     embed_url: str,
+    no_history: bool,
 ) -> None:
     manifest = public_build(
         vault_root=Path(vault),
@@ -209,6 +232,7 @@ def public_build_cli(
         out_dir=Path(out),
         variant=variant,
         embed_url=embed_url,
+        include_history=not no_history,
     )
     click.echo(
         f"wrote {out}/ ({manifest['public_total']} public, "
