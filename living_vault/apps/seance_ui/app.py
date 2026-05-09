@@ -33,11 +33,9 @@ def _db_path() -> Path:
 
 
 @asynccontextmanager
-async def _lifespan(app):
-    # startup
+async def _lifespan(app: FastAPI):
     db_mod.initialize(_db_path())
     yield
-    # shutdown — nothing to clean up
 
 
 app = FastAPI(title="séance", lifespan=_lifespan)
