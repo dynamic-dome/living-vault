@@ -249,3 +249,88 @@ def test_roundtable_response_has_tool_events_aggregated(vault_copy, db_path, mon
     body = r.json()
     consult_events = [e for e in body["tool_events"] if e["tool_name"] == "consult_neighbor"]
     assert len(consult_events) == 2  # one from A, one from B
+
+
+# === Phase-10b Restschuld: 502/partial_replies on mid-loop API failure ===
+
+
+class _RaisingLLM:
+    """A test double that raises on respond_with_tools, simulating an Anthropic
+    API failure mid-roundtable."""
+    def __init__(self, exc: Exception):
+        self._exc = exc
+        self.tool_calls_made: list = []
+
+    def respond(self, system, history):
+        return "(unused)"
+
+    def respond_with_tools(self, system, history, tools, tool_handler, max_iterations=5):
+        raise self._exc
+
+
+def test_roundtable_partial_failure_returns_502_with_partial_replies(
+    vault_copy, db_path, monkeypatch
+):
+    """Spec §6: API error at Persona K of N → return 502 with already-collected
+    partial_replies + tool_events. The 1st speaker's reply is collected, the 2nd
+    speaker's LLM call raises, so the response carries partial_replies=[reply_A]
+    and an error message."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    # 1st speaker succeeds, 2nd speaker raises
+    fake_a = FakeLLMWithTools([{"type": "text", "text": "A reply"}])
+    fake_b_raises = _RaisingLLM(RuntimeError("fake anthropic 503"))
+    monkeypatch.setenv("LIVING_VAULT_ROOT", str(vault_copy))
+    monkeypatch.setenv("LIVING_VAULT_DB", str(db_path))
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
+    from importlib import reload
+    from living_vault.apps.seance_ui import app as app_mod
+    reload(app_mod)
+    fakes_iter = iter([fake_a, fake_b_raises])
+    monkeypatch.setattr(app_mod, "get_llm", lambda: next(fakes_iter))
+    client = TestClient(app_mod.app)
+
+    sid = client.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "freeforall",
+    }).json()["session_id"]
+
+    r = client.post("/api/say", json={"session_id": sid, "text": "go"})
+    assert r.status_code == 502, r.text
+    body = r.json()
+    detail = body["detail"]
+    # Spec: response carries partial_replies from successful speakers + an error
+    assert "partial_replies" in detail
+    assert len(detail["partial_replies"]) == 1
+    assert detail["partial_replies"][0]["persona_path"] == "concepts/note-a.md"
+    assert detail["partial_replies"][0]["text"] == "A reply"
+    assert "error" in detail
+    assert "fake anthropic 503" in detail["error"]
+
+
+def test_roundtable_first_speaker_failure_returns_502_with_empty_partial(
+    vault_copy, db_path, monkeypatch
+):
+    """If the FIRST speaker's LLM raises, partial_replies is empty but we still
+    return 502 (not 500), so the client distinguishes API failure from a bug."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    fake_a_raises = _RaisingLLM(RuntimeError("anthropic 500"))
+    monkeypatch.setenv("LIVING_VAULT_ROOT", str(vault_copy))
+    monkeypatch.setenv("LIVING_VAULT_DB", str(db_path))
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
+    from importlib import reload
+    from living_vault.apps.seance_ui import app as app_mod
+    reload(app_mod)
+    monkeypatch.setattr(app_mod, "get_llm", lambda: fake_a_raises)
+    client = TestClient(app_mod.app)
+
+    sid = client.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "freeforall",
+    }).json()["session_id"]
+    r = client.post("/api/say", json={"session_id": sid, "text": "go"})
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert detail["partial_replies"] == []
+    assert "error" in detail

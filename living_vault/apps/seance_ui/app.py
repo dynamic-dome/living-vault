@@ -346,17 +346,34 @@ def roundtable_say(req: SayReq) -> dict:
         history_for_llm = shared_history_for_persona(_db_path(), req.session_id, speaker_path)
         history_for_llm = _cap_history(history_for_llm)
 
+        # Wrap the LLM call so an Anthropic-API failure mid-roundtable
+        # surfaces as 502 with partial_replies (per spec §6), not as an
+        # opaque 500. Already-collected replies + tool_events are preserved
+        # in the response detail so the user sees what came through.
         llm = get_llm()
-        if hasattr(llm, "respond_with_tools"):
-            reply = llm.respond_with_tools(
-                system=system,
-                history=history_for_llm,
-                tools=[CONSULT_NEIGHBOR_TOOL_DEF],
-                tool_handler=handler_with_capture,
-                max_iterations=5,
+        try:
+            if hasattr(llm, "respond_with_tools"):
+                reply = llm.respond_with_tools(
+                    system=system,
+                    history=history_for_llm,
+                    tools=[CONSULT_NEIGHBOR_TOOL_DEF],
+                    tool_handler=handler_with_capture,
+                    max_iterations=5,
+                )
+            else:
+                reply = llm.respond(system=system, history=history_for_llm)
+        except Exception as e:  # noqa: BLE001 — surface any LLM-loop failure as 502
+            # speaker_tool_events from this aborted speaker are also preserved.
+            tool_events.extend(speaker_tool_events)
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": f"{type(e).__name__}: {e}",
+                    "failed_persona": speaker_path,
+                    "partial_replies": replies,
+                    "tool_events": tool_events,
+                },
             )
-        else:
-            reply = llm.respond(system=system, history=history_for_llm)
 
         store.add_message(
             _db_path(), req.session_id, "assistant", reply,
