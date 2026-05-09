@@ -44,10 +44,11 @@
 | 7 | Phase-1-Integration & Polish | End-to-End-Test, Privacy-Test-Suite, Doku, Acceptance-Checklist | ✅ |
 | 8 | **Phase-1-Abschluss-Gate** | User-Review aller drei Linsen, Entscheidung: Phase 2 starten oder pausieren | ✅ |
 | 9 | (Phase 2) core/persona.py — Schicht 3 Persona-Vollausbau | persona.py, voice-extraction, era-marker | ✅ |
-| 10 | (Phase 2) synesthesia public subset + portfolio 3D-Embed | --public-only Modus, Privacy-Tests, Site-Embed | ⏳ |
-| 11 | (Phase 2) séance MCP-Tool + commit_insight | seance.summon, seance.commit_insight, Multi-Page-Modus | ⏳ |
-| 12 | (Phase 2) Version-History-Modal in living-portfolio | Git-Backed Page-History-API, Modal-UI | ⏳ |
-| 13 | Abschluss-Synthese | wiki/synthesis-Page mit current thesis, lessons learned, what to investigate next | ⏳ |
+| 10 | (Phase 2) Nachbar-Gespräche (Stufe 2 + 3) | `consult_neighbor` Tool-Use + Multi-Persona-Roundtable + Mode-Toggle | 🟡 |
+| 11 | (Phase 2) synesthesia public subset + portfolio 3D-Embed | --public-only Modus, Privacy-Tests, Site-Embed | ⏳ |
+| 12 | (Phase 2) séance MCP-Tool + commit_insight | seance.summon, seance.commit_insight, Multi-Page-Modus | ⏳ |
+| 13 | (Phase 2) Version-History-Modal in living-portfolio | Git-Backed Page-History-API, Modal-UI | ⏳ |
+| 14 | Abschluss-Synthese | wiki/synthesis-Page mit current thesis, lessons learned, what to investigate next | ⏳ |
 
 **Status-Symbole:** ✅ done | 🟡 in progress | ⏳ pending | ❌ blocked
 
@@ -133,4 +134,4 @@ Wer in dieses Projekt einsteigt, sollte zuerst:
 4. `~/wiki/wiki/synthesis/2026-05-08-mcp-ideen-genese-notebooklm.md` für Hintergrund (warum diese drei Tools)
 5. Status-Symbole in Phasen-Tabelle ernst nehmen — wer ⏳ überspringt, bricht das Fundament
 
-Aktuelle Position: **Phase 8 + 9 ✅ abgeschlossen am 2026-05-09**, Phase 10 ⏳ pending (User wählt: Synesthesia-Interaktiv ODER Nachbar-Gespräche, beide als Wiki-TODOs unter `~/wiki/wiki/todos/2026-05-09-living-vault-phase-10-*` notiert). Phase-9-Sichtprüfung positiv ("subtil aber spürbar"), 118 Tests grün, 5 Pages mit echter Anthropic-Distillation in Live-DB.
+Aktuelle Position: **Phase 8 + 9 ✅ abgeschlossen am 2026-05-09**. Phase 10 🟡 in Arbeit ab 2026-05-09: **Nachbar-Gespräche** (Stufe 2 Pull-on-Demand + Stufe 3 Multi-Persona-Roundtable mit Mode-Toggle, siehe `~/wiki/wiki/todos/2026-05-09-living-vault-phase-10-neighbor-talk.md`). User-Pick 2026-05-09: B → A — Synesthesia public subset rutscht auf Phase 11. Phase-9-Sichtprüfung positiv ("subtil aber spürbar"), 118 Tests grün, 5 Pages mit echter Anthropic-Distillation in Live-DB.
