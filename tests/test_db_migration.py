@@ -67,3 +67,59 @@ def test_initialize_is_idempotent_on_phase9_schema(tmp_path: Path):
     assert "voice_features" in cols
     assert "voice_distilled" in cols
     con.close()
+
+
+def test_initialize_adds_persona_path_to_legacy_seance_messages(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    # arrange: legacy DB with seance_messages but without persona_path
+    con = sqlite3.connect(str(db_path))
+    con.executescript("""
+        CREATE TABLE seance_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            page_path TEXT NOT NULL,
+            started_at TEXT NOT NULL
+        );
+        CREATE TABLE seance_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES seance_sessions(id),
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+    con.execute(
+        "INSERT INTO seance_sessions (page_path, started_at) VALUES (?, ?)",
+        ("legacy/page.md", "2026-05-08T00:00:00Z"),
+    )
+    con.execute(
+        "INSERT INTO seance_messages (session_id, role, content, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (1, "user", "hello", "2026-05-08T00:00:00Z"),
+    )
+    con.commit()
+    con.close()
+
+    # act
+    db_mod.initialize(db_path)
+
+    # assert: column exists, legacy row preserved with NULL persona_path
+    con = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(seance_messages)")}
+    assert "persona_path" in cols
+    row = con.execute(
+        "SELECT role, content, persona_path FROM seance_messages WHERE id = 1"
+    ).fetchone()
+    assert row[0] == "user"
+    assert row[1] == "hello"
+    assert row[2] is None
+    con.close()
+
+
+def test_initialize_persona_path_idempotent(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    db_mod.initialize(db_path)
+    db_mod.initialize(db_path)  # second call must not raise duplicate-column
+    con = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(seance_messages)")}
+    assert "persona_path" in cols
+    con.close()

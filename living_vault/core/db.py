@@ -79,6 +79,11 @@ _PHASE_9_PAGES_COLUMNS = [
     ("voice_distilled", "TEXT"),   # 3-5 sentence LLM voice description, NULL until extract-voice runs
 ]
 
+# Phase-10a additive columns for seance_messages.
+_PHASE_10A_SEANCE_MESSAGES_COLUMNS = [
+    ("persona_path", "TEXT"),  # NULL for user messages, set for assistant + tool_use
+]
+
 
 def _column_exists(con: sqlite3.Connection, table: str, col: str) -> bool:
     return any(r[1] == col for r in con.execute(f"PRAGMA table_info({table})"))
@@ -95,6 +100,9 @@ def initialize(db_path: Path) -> None:
         for col, sqltype in _PHASE_9_PAGES_COLUMNS:
             if not _column_exists(con, "pages", col):
                 con.execute(f"ALTER TABLE pages ADD COLUMN {col} {sqltype}")
+        for col, sqltype in _PHASE_10A_SEANCE_MESSAGES_COLUMNS:
+            if not _column_exists(con, "seance_messages", col):
+                con.execute(f"ALTER TABLE seance_messages ADD COLUMN {col} {sqltype}")
         con.commit()
     finally:
         con.close()
