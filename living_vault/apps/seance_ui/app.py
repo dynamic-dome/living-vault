@@ -94,51 +94,55 @@ def summon(req: SummonReq) -> dict:
     else:
         raise HTTPException(status_code=400, detail="must provide 'path' or 'paths'")
 
+    # Length check on raw input (so 9 duplicates correctly return 413 before dedup).
     if len(paths) == 0:
         raise HTTPException(status_code=400, detail="at least one page required")
     if len(paths) > 8:
         raise HTTPException(status_code=413, detail="max 8 personas per roundtable")
 
-    # Dedup while preserving order
-    seen: set[str] = set()
-    paths_dedup: list[str] = []
-    for p in paths:
-        if p not in seen:
-            seen.add(p)
-            paths_dedup.append(p)
-    paths = paths_dedup
+    # Dedup preserving order (Python 3.7+ dicts preserve insertion order).
+    paths = list(dict.fromkeys(paths))
 
-    # Validate mode
+    # Validate mode + coerce based on path count.
     if req.mode not in VALID_MODES:
         raise HTTPException(status_code=400, detail=f"unknown mode: {req.mode}")
-    # Single page implies single mode
-    mode = "single" if len(paths) == 1 and req.mode == "single" else req.mode
-    # Multi-page with mode=single is forced to roundrobin (UX safeguard)
-    if len(paths) > 1 and mode == "single":
+    if len(paths) == 1:
+        # Single path always means single-mode session; ignore any roundtable
+        # mode the caller might have requested (UX safeguard).
+        mode = "single"
+    elif req.mode == "single":
+        # Multi-path with mode=single doesn't make sense; default to roundrobin.
         mode = "roundrobin"
+    else:
+        mode = req.mode
 
-    # Validate each page exists, build personas
-    personas_out: list[dict] = []
+    # Validate each page AND keep the built persona dicts for response reuse.
+    built_personas: list[dict] = []
     for p in paths:
         persona = build_persona(_vault_root(), _db_path(), p)
         if persona is None:
             raise HTTPException(status_code=404, detail=f"page not found: {p}")
+        built_personas.append(persona)
 
-    # Create session — page_path is the first path for legacy compatibility
+    # Create session — page_path is paths[0] for legacy compatibility with
+    # the existing /api/say flow that reads page_path from seance_sessions.
     sid = store.new_session(_db_path(), page_path=paths[0], mode=mode)
 
-    # Add personas with seat_idx + color
+    # Add personas + assemble response personas array in one pass.
+    personas_out: list[dict] = []
     for i, p in enumerate(paths):
         color = hash_color(p)
         store.add_session_persona(_db_path(), sid, p, color=color, seat_idx=i)
         personas_out.append({"persona_path": p, "color": color, "seat_idx": i})
 
-    response: dict = {"session_id": sid, "mode": mode, "personas": personas_out}
-    # Backward-compat: also include first persona dict under 'persona' key
-    first_persona = build_persona(_vault_root(), _db_path(), paths[0])
-    if first_persona is not None:
-        response["persona"] = first_persona
-    return response
+    return {
+        "session_id": sid,
+        "mode": mode,
+        "personas": personas_out,
+        # Backward-compat: legacy callers expect a `persona` field with the
+        # first page's full persona dict. Reuse the validation-loop result.
+        "persona": built_personas[0],
+    }
 
 
 def _cap_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:

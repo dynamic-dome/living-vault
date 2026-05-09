@@ -347,3 +347,38 @@ def test_summon_with_unknown_path_returns_404(vault_copy, db_path, monkeypatch):
         "mode": "roundrobin",
     })
     assert r.status_code == 404
+
+
+def test_summon_single_path_coerces_to_single_mode(vault_copy, db_path, monkeypatch):
+    """A single-path summon with mode='roundrobin' must coerce to 'single'.
+    Otherwise we'd create a degenerate 'single-persona roundrobin' session that
+    breaks the say() mode-branch in Task 7 (roundtable_say expects >=1 persona
+    but the UX only makes sense with >=2)."""
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={
+        "paths": ["concepts/note-a.md"],
+        "mode": "roundrobin",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["mode"] == "single"
+    sid = body["session_id"]
+    assert store.get_session_mode(db_path, sid) == "single"
+
+
+def test_summon_empty_paths_array_returns_400(vault_copy, db_path, monkeypatch):
+    """`{paths: []}` must return 400 with the at-least-one-page message,
+    not silently fall through to the legacy `path` branch."""
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={"paths": [], "mode": "roundrobin"})
+    assert r.status_code == 400
+    assert "at least one page" in r.text.lower()
