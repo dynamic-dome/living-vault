@@ -33,6 +33,7 @@ dev = [
 [project.scripts]
 living-vault = "living_vault.cli:main"
 living-vault-mcp = "living_vault.mcp_servers.vault_engine.server:main"
+seance-mcp = "living_vault.mcp_servers.seance.server:main"
 synesthesia = "living_vault.apps.synesthesia.render:cli"
 synesthesia-public-build = "living_vault.apps.synesthesia.render:public_build_cli"
 portfolio-sync = "living_vault.apps.portfolio_sync.sync:cli"
