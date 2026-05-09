@@ -108,7 +108,8 @@ Du sitzt aktuell mit weiteren Personas an einem Roundtable. Du kannst sie
 oben mit aufgeführt. Die Teammates an diesem Tisch sind:
 {teammate_lines}
 Antworte so, dass dein Beitrag zum Gespräch passt: greife auf, was sie
-gesagt haben (siehst du als '[name says]: ...' in der History), korrigiere
+gesagt haben (siehst du als '[<path-stem> says]: ...' in der History,
+z.B. '[teammate-a says]: ...' für `concepts/teammate-a.md'), korrigiere
 oder ergänze, aus deiner Perspektive.
 """
 
