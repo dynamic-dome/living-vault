@@ -115,3 +115,50 @@ def test_export_session_404(vault_copy, db_path, monkeypatch, tmp_path):
     c = _client(vault_copy, db_path, monkeypatch)
     r = c.post("/api/sessions/9999/export")
     assert r.status_code == 404
+
+
+# === Cost/DoS regression tests (Codex Security finding 2026-05-09) ===
+
+
+def test_say_rejects_oversized_text(vault_copy, db_path, monkeypatch):
+    """A user message longer than the cap must return 413, not flow through to LLM."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={"path": "concepts/note-a.md"})
+    sid = r.json()["session_id"]
+    huge_text = "x" * 50_000  # well over 8K cap
+    r2 = c.post("/api/say", json={"session_id": sid, "text": huge_text})
+    assert r2.status_code == 413
+    assert "too long" in r2.text.lower()
+
+
+def test_say_caps_history_replay(vault_copy, db_path, monkeypatch):
+    """After many turns, only the last N messages should be replayed to the LLM."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={"path": "concepts/note-a.md"})
+    sid = r.json()["session_id"]
+    # 60 turns — exceeds the 50-message cap
+    for i in range(60):
+        r_say = c.post("/api/say", json={"session_id": sid, "text": f"msg{i}"})
+        assert r_say.status_code == 200
+    # FakeLLM echoes the LAST user message it sees in history. If no cap was
+    # enforced it would still see msg59. With the cap it also sees msg59 (the most
+    # recent). The cap behavior is observable indirectly — we verify the function
+    # `_cap_history` exists and works.
+    from living_vault.apps.seance_ui.app import _cap_history, _MAX_HISTORY_MESSAGES
+    history = [("user", f"x{i}") for i in range(100)]
+    capped = _cap_history(history)
+    assert len(capped) <= _MAX_HISTORY_MESSAGES
+
+
+def test_cap_history_drops_oldest_when_total_chars_exceed(vault_copy, db_path, monkeypatch):
+    """If a single huge message would push total over cap, drop oldest."""
+    from living_vault.apps.seance_ui.app import _cap_history, _MAX_HISTORY_TOTAL_CHARS
+    # Build a fake history with huge messages
+    history = [("user", "x" * 5000) for _ in range(20)]  # 100k chars
+    capped = _cap_history(history)
+    total = sum(len(content) for _, content in capped)
+    assert total <= _MAX_HISTORY_TOTAL_CHARS

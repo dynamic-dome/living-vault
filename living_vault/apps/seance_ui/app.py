@@ -41,6 +41,13 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="séance", lifespan=_lifespan)
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Cost/DoS guards (Codex Security finding 2026-05-09).
+# Local-only setup, but unbounded text + replayed history would still
+# cause runaway Anthropic-API spend on a malformed client.
+_MAX_USER_TEXT_CHARS = 8_000        # per-message user text cap
+_MAX_HISTORY_MESSAGES = 50          # last N messages replayed to LLM
+_MAX_HISTORY_TOTAL_CHARS = 32_000   # total chars across replayed history
+
 
 class SummonReq(BaseModel):
     path: str
@@ -77,8 +84,23 @@ def summon(req: SummonReq) -> dict:
     return {"session_id": sid, "persona": persona}
 
 
+def _cap_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Replay only the last N messages; further trim oldest if total chars exceed cap."""
+    capped = history[-_MAX_HISTORY_MESSAGES:]
+    total = sum(len(content) for _, content in capped)
+    while total > _MAX_HISTORY_TOTAL_CHARS and len(capped) > 1:
+        _, dropped = capped.pop(0)
+        total -= len(dropped)
+    return capped
+
+
 @app.post("/api/say")
 def say(req: SayReq) -> dict:
+    if len(req.text) > _MAX_USER_TEXT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"text too long ({len(req.text)} chars, max {_MAX_USER_TEXT_CHARS})",
+        )
     history = store.get_history(_db_path(), req.session_id)
     # find the page for this session
     con = db_mod.connect(_db_path())
@@ -98,6 +120,7 @@ def say(req: SayReq) -> dict:
     system = build_system_prompt(persona, neighbor_titles=[Path(n).stem for n in nbs])
 
     history.append(("user", req.text))
+    history = _cap_history(history)
     llm = get_llm()
     reply = llm.respond(system=system, history=history)
 
