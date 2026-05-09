@@ -89,6 +89,9 @@ def initialize(db_path: Path) -> None:
     con = sqlite3.connect(str(db_path))
     try:
         con.executescript(SCHEMA)
+        # Note: executescript issues an implicit COMMIT before running. ALTER TABLE in SQLite
+        # is auto-committed; the con.commit() below is a no-op safety net. Migration is safe-to-retry
+        # because _column_exists() guards each ADD COLUMN. Do NOT add non-DDL logic here expecting rollback.
         for col, sqltype in _PHASE_9_PAGES_COLUMNS:
             if not _column_exists(con, "pages", col):
                 con.execute(f"ALTER TABLE pages ADD COLUMN {col} {sqltype}")
