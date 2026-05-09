@@ -144,8 +144,9 @@ def test_public_build_skips_nonexistent_allowlist_paths(vault_copy: Path, tmp_pa
 
 
 def test_public_build_is_deterministic_modulo_build_at(vault_copy: Path, tmp_path: Path):
-    """Two consecutive builds with same inputs produce byte-identical index.html and pages.json.
-    manifest.json may differ only in build_at.
+    """Two consecutive builds with same inputs produce identical content
+    except the build-stamp lines (build_at, build_date in HTML brand block;
+    build_at in manifest.json). pages.json must be byte-identical.
     No private paths must appear in the HTML.
     """
     db = _setup_db(vault_copy, tmp_path)
@@ -171,13 +172,23 @@ def test_public_build_is_deterministic_modulo_build_at(vault_copy: Path, tmp_pat
     out1 = tmp_path / "out1"
     out2 = tmp_path / "out2"
 
-    html1 = (out1 / "index.html").read_bytes()
-    html2 = (out2 / "index.html").read_bytes()
-    assert html1 == html2, "index.html is not deterministic across builds"
-
+    # pages.json must be byte-identical (no time-dependent fields)
     pages1 = (out1 / "pages.json").read_bytes()
     pages2 = (out2 / "pages.json").read_bytes()
     assert pages1 == pages2, "pages.json is not deterministic across builds"
+
+    # index.html may differ only on build-stamp lines.
+    # Strip lines containing "Build " or "Stand " before comparing.
+    def _strip_buildstamp(text: str) -> str:
+        return "\n".join(
+            line for line in text.splitlines()
+            if "Build " not in line and "Stand " not in line
+        )
+
+    html1_text = (out1 / "index.html").read_text(encoding="utf-8")
+    html2_text = (out2 / "index.html").read_text(encoding="utf-8")
+    assert _strip_buildstamp(html1_text) == _strip_buildstamp(html2_text), \
+        "index.html content (excluding build-stamp lines) is not deterministic"
 
     # manifest may differ only in build_at — check all other fields equal
     m1 = json.loads((out1 / "manifest.json").read_text(encoding="utf-8"))
@@ -188,6 +199,51 @@ def test_public_build_is_deterministic_modulo_build_at(vault_copy: Path, tmp_pat
         assert m1[key] == m2[key], f"manifest field '{key}' differs: {m1[key]} vs {m2[key]}"
 
     # Privacy check: synthesis/syn-1.md is private and NOT in allowlist
-    html_text = html1.decode("utf-8")
-    assert "synthesis/syn-1.md" not in html_text, \
+    assert "synthesis/syn-1.md" not in html1_text, \
         "PRIVACY LEAK: private path synthesis/syn-1.md found in public build HTML"
+
+
+def test_public_build_html_has_branding_header(vault_copy: Path, tmp_path: Path):
+    """Phase-11.4: standalone HTML carries a brand header (subroute + page count)
+    and a footer build-stamp."""
+    db = _setup_db(vault_copy, tmp_path)
+    allowlist_file = tmp_path / "allowlist.txt"
+    allowlist_file.write_text("concepts/note-a.md\n", encoding="utf-8")
+
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        [
+            "--vault", str(vault_copy),
+            "--db", str(db),
+            "--allowlist", str(allowlist_file),
+            "--out", str(tmp_path / "out"),
+            "--embed-url", "https://vault.dynamic-dome.com",
+        ],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+
+    html = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+    assert "vault.dynamic-dome.com" in html
+    assert "öffentliche Pages aus" in html
+    assert "schema v1" in html
+
+
+def test_public_build_html_uses_custom_embed_url(vault_copy: Path, tmp_path: Path):
+    """Phase-11.4: --embed-url override propagates into the HTML brand line."""
+    db = _setup_db(vault_copy, tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(
+        public_build_cli,
+        [
+            "--vault", str(vault_copy),
+            "--db", str(db),
+            "--out", str(tmp_path / "out"),
+            "--embed-url", "https://example.test",
+        ],
+    )
+    assert res.exit_code == 0, f"{res.output}\n{res.exception}"
+
+    html = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+    assert "example.test" in html
+    assert "vault.dynamic-dome.com" not in html
