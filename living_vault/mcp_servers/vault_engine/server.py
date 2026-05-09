@@ -24,6 +24,7 @@ from fastmcp import FastMCP
 
 from living_vault.core import db as db_mod
 from living_vault.core import reader, graph, embeddings, decay, privacy
+from living_vault.core import history as history_mod
 from living_vault.core.indexer import index_vault
 from living_vault.core.embeddings import (
     index_embeddings,
@@ -113,6 +114,10 @@ def _tool_public_pages() -> list[str]:
         con.close()
 
 
+def _tool_page_history(path: str, limit: int = 10) -> list[dict]:
+    return history_mod.page_history(_vault_root(), path, limit=limit)
+
+
 def _tool_reindex(force: bool = False) -> dict:
     db_mod.initialize(_db_path())
     if force:
@@ -172,6 +177,12 @@ def stale_pages(days: int = 90) -> list[str]:
 def public_pages() -> list[str]:
     """Pages with frontmatter `public: true`."""
     return _tool_public_pages()
+
+
+@mcp.tool()
+def page_history(path: str, limit: int = 10) -> list[dict]:
+    """Last N commits affecting the page (newest first). Empty if no git history."""
+    return _tool_page_history(path, limit)
 
 
 @mcp.tool()
