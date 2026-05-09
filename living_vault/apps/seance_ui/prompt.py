@@ -101,6 +101,17 @@ def _format_neighbors_with_paths(titles: list[str], paths: list[str]) -> str:
     return "\n" + "\n".join(lines)
 
 
+_TEAMMATE_BLOCK = """
+# Andere Personas am Tisch
+Du sitzt aktuell mit weiteren Personas an einem Roundtable. Du kannst sie
+über `consult_neighbor` direkt befragen — ihre Pfade sind in der Liste
+oben mit aufgeführt. Die Teammates an diesem Tisch sind:
+{teammate_lines}
+Antworte so, dass dein Beitrag zum Gespräch passt: greife auf, was sie
+gesagt haben (siehst du als '[name says]: ...' in der History), korrigiere
+oder ergänze, aus deiner Perspektive.
+"""
+
 _TOOL_USE_BLOCK = """
 # Calling consult_neighbor
 You have access to a tool `consult_neighbor(neighbor_path)` that fetches the
@@ -116,6 +127,7 @@ def build_system_prompt(
     persona: dict,
     neighbor_titles: list[str],
     neighbor_paths: list[str] | None = None,
+    teammate_paths: list[str] | None = None,
 ) -> str:
     voice_block = build_voice_block(persona)
     themes = ", ".join(persona.get("themes", [])) or "(none)"
@@ -125,6 +137,13 @@ def build_system_prompt(
     else:
         neighbors = ", ".join(neighbor_titles) or "(none)"
         tool_use_block = ""
+
+    if teammate_paths:
+        teammate_lines = "\n".join(f"  - `{p}`" for p in teammate_paths)
+        teammate_block = _TEAMMATE_BLOCK.format(teammate_lines=teammate_lines)
+    else:
+        teammate_block = ""
+
     return _TEMPLATE.format(
         path=persona["path"],
         title=persona["title"],
@@ -133,5 +152,5 @@ def build_system_prompt(
         neighbors=neighbors,
         voice_block=voice_block,
         body_excerpt=persona.get("body_excerpt", "") or "(empty body)",
-        tool_use_block=tool_use_block,
+        tool_use_block=tool_use_block + teammate_block,
     )

@@ -143,3 +143,47 @@ def test_system_prompt_neighbor_paths_optional_for_phase1_compat():
     # consult_neighbor mention is fine to omit when no paths are passed
     # (we don't strictly require its absence — the test just verifies the
     # legacy two-argument call shape still works without raising)
+
+
+# === Phase-10b Task 5: teammate_paths for roundtable context ===
+
+
+def test_system_prompt_includes_teammate_paths_when_provided():
+    """Phase-10b: when in a roundtable, the persona must know who else is at
+    the table so it can decide to consult them via consult_neighbor."""
+    p = _persona_full()
+    out = build_system_prompt(
+        p,
+        neighbor_titles=["x", "y"],
+        neighbor_paths=["concepts/x.md", "concepts/y.md"],
+        teammate_paths=["concepts/teammate-a.md", "concepts/teammate-b.md"],
+    )
+    assert "concepts/teammate-a.md" in out
+    assert "concepts/teammate-b.md" in out
+    # the prompt mentions the roundtable context
+    assert "Tisch" in out or "teammates" in out.lower() or "roundtable" in out.lower()
+
+
+def test_system_prompt_no_teammate_block_when_paths_empty():
+    p = _persona_full()
+    out = build_system_prompt(
+        p,
+        neighbor_titles=["x"],
+        neighbor_paths=["concepts/x.md"],
+        teammate_paths=[],
+    )
+    # empty list: no teammate-block content
+    assert "Tisch" not in out and "teammates" not in out.lower() and "roundtable" not in out.lower()
+
+
+def test_system_prompt_teammate_paths_optional_for_phase10a_compat():
+    """Phase-10a callers that only pass neighbor_paths must still work."""
+    p = _persona_full()
+    out = build_system_prompt(
+        p,
+        neighbor_titles=["x"],
+        neighbor_paths=["concepts/x.md"],
+    )
+    # no teammate context, no roundtable mention
+    assert "concepts/x.md" in out
+    assert "Tisch" not in out
