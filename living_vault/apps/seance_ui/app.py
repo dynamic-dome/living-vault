@@ -20,6 +20,7 @@ from living_vault.apps.seance_ui.neighbors import (
     CONSULT_NEIGHBOR_TOOL_DEF,
     make_consult_neighbor_handler,
 )
+from living_vault.apps.seance_ui.roundtable import VALID_MODES, hash_color
 
 
 def _vault_root() -> Path:
@@ -54,7 +55,11 @@ _MAX_HISTORY_TOTAL_CHARS = 32_000   # total chars across replayed history
 
 
 class SummonReq(BaseModel):
-    path: str
+    # Phase-1 single-path shape (backward-compat):
+    path: str | None = None
+    # Phase-10b multi-path shape:
+    paths: list[str] | None = None
+    mode: str = "single"
 
 
 class SayReq(BaseModel):
@@ -81,11 +86,59 @@ def list_pages() -> list[dict]:
 
 @app.post("/api/summon")
 def summon(req: SummonReq) -> dict:
-    persona = build_persona(_vault_root(), _db_path(), req.path)
-    if persona is None:
-        raise HTTPException(status_code=404, detail=f"page not found: {req.path}")
-    sid = store.new_session(_db_path(), page_path=req.path)
-    return {"session_id": sid, "persona": persona}
+    # Determine path list: legacy `path` or new `paths`
+    if req.paths is not None:
+        paths = list(req.paths)
+    elif req.path is not None:
+        paths = [req.path]
+    else:
+        raise HTTPException(status_code=400, detail="must provide 'path' or 'paths'")
+
+    if len(paths) == 0:
+        raise HTTPException(status_code=400, detail="at least one page required")
+    if len(paths) > 8:
+        raise HTTPException(status_code=413, detail="max 8 personas per roundtable")
+
+    # Dedup while preserving order
+    seen: set[str] = set()
+    paths_dedup: list[str] = []
+    for p in paths:
+        if p not in seen:
+            seen.add(p)
+            paths_dedup.append(p)
+    paths = paths_dedup
+
+    # Validate mode
+    if req.mode not in VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"unknown mode: {req.mode}")
+    # Single page implies single mode
+    mode = "single" if len(paths) == 1 and req.mode == "single" else req.mode
+    # Multi-page with mode=single is forced to roundrobin (UX safeguard)
+    if len(paths) > 1 and mode == "single":
+        mode = "roundrobin"
+
+    # Validate each page exists, build personas
+    personas_out: list[dict] = []
+    for p in paths:
+        persona = build_persona(_vault_root(), _db_path(), p)
+        if persona is None:
+            raise HTTPException(status_code=404, detail=f"page not found: {p}")
+
+    # Create session — page_path is the first path for legacy compatibility
+    sid = store.new_session(_db_path(), page_path=paths[0], mode=mode)
+
+    # Add personas with seat_idx + color
+    for i, p in enumerate(paths):
+        color = hash_color(p)
+        store.add_session_persona(_db_path(), sid, p, color=color, seat_idx=i)
+        personas_out.append({"persona_path": p, "color": color, "seat_idx": i})
+
+    response: dict = {"session_id": sid, "mode": mode, "personas": personas_out}
+    # Backward-compat: also include first persona dict under 'persona' key
+    first_persona = build_persona(_vault_root(), _db_path(), paths[0])
+    if first_persona is not None:
+        response["persona"] = first_persona
+    return response
 
 
 def _cap_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:

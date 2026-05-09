@@ -265,3 +265,85 @@ def test_phase_10a_allowlist_blocks_bypass_attempt(vault_copy, db_path, monkeypa
         if "error" in (ev.get("tool_result_summary") or {})
     ]
     assert len(error_events) >= 1
+
+
+# === Phase-10b: paths[] + mode summon tests ===
+
+
+def test_summon_with_paths_and_mode_creates_session_personas(vault_copy, db_path, monkeypatch):
+    """Phase-10b: summon with paths=[...]+mode= creates seance_session_personas rows."""
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    from living_vault.apps.seance_ui import store
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "roundrobin",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    sid = body["session_id"]
+    assert body["mode"] == "roundrobin"
+    assert len(body["personas"]) == 2
+    assert body["personas"][0]["persona_path"] == "concepts/note-a.md"
+    assert body["personas"][1]["seat_idx"] == 1
+
+    # personas persisted in DB
+    rows = store.get_session_personas(db_path, sid)
+    assert len(rows) == 2
+
+    # mode persisted on session
+    assert store.get_session_mode(db_path, sid) == "roundrobin"
+
+
+def test_summon_with_legacy_path_keyword_still_works(vault_copy, db_path, monkeypatch):
+    """Phase-10a single-page summon shape must still work after Phase-10b extends."""
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={"path": "concepts/note-a.md"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "session_id" in body
+    # response shape contains persona for backward compat
+    assert "persona" in body
+
+
+def test_summon_rejects_too_many_paths(vault_copy, db_path, monkeypatch):
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    too_many = ["concepts/note-a.md"] * 9  # 9 > 8
+    r = c.post("/api/summon", json={"paths": too_many, "mode": "freeforall"})
+    assert r.status_code == 413
+
+
+def test_summon_rejects_unknown_mode(vault_copy, db_path, monkeypatch):
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={"paths": ["concepts/note-a.md"], "mode": "wibble"})
+    assert r.status_code == 400
+
+
+def test_summon_with_unknown_path_returns_404(vault_copy, db_path, monkeypatch):
+    from living_vault.core import db as db_mod
+    from living_vault.core.indexer import index_vault
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/does-not-exist.md"],
+        "mode": "roundrobin",
+    })
+    assert r.status_code == 404
