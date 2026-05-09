@@ -187,11 +187,11 @@ def count_user_turns(db_path: Path, session_id: int) -> int:
     con = db_mod.connect(db_path)
     try:
         row = con.execute(
-            "SELECT COUNT(*) FROM seance_messages "
+            "SELECT COUNT(*) AS cnt FROM seance_messages "
             "WHERE session_id = ? AND role = 'user'",
             (session_id,),
         ).fetchone()
-        return int(row[0])
+        return row["cnt"]
     finally:
         con.close()
 

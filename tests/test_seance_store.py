@@ -140,12 +140,8 @@ def test_new_session_persists_mode(db_path):
     from living_vault.apps.seance_ui import store
     db_mod.initialize(db_path)
     sid = store.new_session(db_path, "concepts/x.md", mode="freeforall")
-    # mode is persisted in seance_sessions
-    import sqlite3
-    con = sqlite3.connect(str(db_path))
-    row = con.execute("SELECT mode FROM seance_sessions WHERE id = ?", (sid,)).fetchone()
-    con.close()
-    assert row[0] == "freeforall"
+    # mode is persisted in seance_sessions, also reachable via the helper
+    assert store.get_session_mode(db_path, sid) == "freeforall"
 
 
 def test_new_session_default_mode_is_single(db_path):
@@ -153,30 +149,37 @@ def test_new_session_default_mode_is_single(db_path):
     from living_vault.apps.seance_ui import store
     db_mod.initialize(db_path)
     sid = store.new_session(db_path, "concepts/x.md")  # no mode kwarg
-    import sqlite3
-    con = sqlite3.connect(str(db_path))
-    row = con.execute("SELECT mode FROM seance_sessions WHERE id = ?", (sid,)).fetchone()
-    con.close()
-    assert row[0] == "single"
+    assert store.get_session_mode(db_path, sid) == "single"
 
 
-def test_add_and_get_session_personas(db_path):
+def test_get_session_mode_returns_none_for_unknown_session(db_path):
+    from living_vault.core import db as db_mod
+    from living_vault.apps.seance_ui import store
+    db_mod.initialize(db_path)
+    assert store.get_session_mode(db_path, 9999) is None
+
+
+def test_add_and_get_session_personas_orders_by_seat_idx(db_path):
+    """Insert in non-monotonic order to actually exercise ORDER BY."""
     from living_vault.core import db as db_mod
     from living_vault.apps.seance_ui import store
     db_mod.initialize(db_path)
     sid = store.new_session(db_path, "concepts/a.md", mode="roundrobin")
+    # Insert seat_idx 2 first, then 0, then 1 — SELECT must still return 0,1,2
+    store.add_session_persona(db_path, sid, "concepts/c.md", color="#c9b3ff", seat_idx=2)
     store.add_session_persona(db_path, sid, "concepts/a.md", color="#7adfd5", seat_idx=0)
     store.add_session_persona(db_path, sid, "concepts/b.md", color="#a8e6cf", seat_idx=1)
-    store.add_session_persona(db_path, sid, "concepts/c.md", color="#c9b3ff", seat_idx=2)
 
     rows = store.get_session_personas(db_path, sid)
     assert len(rows) == 3
-    # ordered by seat_idx
+    # ordered by seat_idx, NOT by insertion order
+    assert rows[0]["seat_idx"] == 0
     assert rows[0]["persona_path"] == "concepts/a.md"
     assert rows[0]["color"] == "#7adfd5"
-    assert rows[0]["seat_idx"] == 0
+    assert rows[1]["seat_idx"] == 1
     assert rows[1]["persona_path"] == "concepts/b.md"
     assert rows[2]["seat_idx"] == 2
+    assert rows[2]["persona_path"] == "concepts/c.md"
 
 
 def test_count_user_turns(db_path):
