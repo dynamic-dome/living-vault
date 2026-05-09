@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from living_vault.core import db as db_mod
+from living_vault.core import history as history_mod
 from living_vault.core.indexer import index_vault
 from living_vault.core.embeddings import index_embeddings
 from living_vault.core.llm import get_llm
@@ -123,6 +124,24 @@ def extract_voice_cmd(vault: str, db: str, limit: int | None, force: bool, yes: 
     click.echo(f"done: {ok} OK, {failed} failed.")
     if failed:
         click.echo("Re-run extract-voice to retry failed pages.", err=True)
+
+
+@cli.command("history")
+@click.argument("path")
+@click.option("--vault", required=True, type=click.Path(exists=True, file_okay=False))
+@click.option("--limit", default=10, type=int, help="number of commits (default 10, max 100)")
+def history_cmd(path: str, vault: str, limit: int) -> None:
+    """Show git history of a vault page (Phase 13)."""
+    rows = history_mod.page_history(Path(vault), path, limit=limit)
+    if not rows:
+        click.echo("(no history found)")
+        return
+    click.echo(f"{'sha':<10} {'date':<25} {'author':<20} subject")
+    click.echo("-" * 80)
+    for r in rows:
+        date = (r["date"] or "")[:25]
+        author = (r["author"] or "")[:20]
+        click.echo(f"{r['sha']:<10} {date:<25} {author:<20} {r['subject']}")
 
 
 def main() -> None:
