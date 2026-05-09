@@ -47,6 +47,16 @@
       border-left-color:#e80;
       color:#fc8;
     }
+    /* Phase-10b: multi-select page picker + mode dropdown */
+    .pageItem.selected{background:#234;border-left:3px solid #4a8;}
+    #modeRow{padding:8px;border-top:1px solid #234;display:none;}
+    #modeRow.visible{display:flex;gap:8px;align-items:center;font-size:11px;}
+    #modeRow select{background:#13202c;color:#cfe;border:1px solid #234;padding:4px;font-family:inherit;font-size:11px;}
+    #summonBtn{background:#1a3a1c;color:#cfe;border:1px solid #4a8;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px;}
+    #summonBtn:disabled{opacity:.4;cursor:not-allowed;}
+    /* Phase-10b: persona-labeled assistant bubbles */
+    .msg.persona{background:#1a2e1c;border-left:3px solid #4a8;padding-left:10px;}
+    .personaLabel{font-size:10px;font-weight:bold;opacity:.85;margin-bottom:4px;}
     #form{display:flex;gap:8px;}
     #txt{flex:1;background:#13202c;border:1px solid #234;color:#cfe;padding:8px;border-radius:4px;font-family:inherit;}
     button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;font-family:inherit;}
@@ -62,6 +72,15 @@
       <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">past sessions</div>
     </div>
     <div id="list"><div style="opacity:.6;font-size:11px;">loading…</div></div>
+    <div id="modeRow">
+      <label>mode:</label>
+      <select id="modeSelect">
+        <option value="roundrobin">round-robin</option>
+        <option value="moderator">moderator (@-mention)</option>
+        <option value="freeforall">free-for-all</option>
+      </select>
+      <button id="summonBtn" onclick="summonRoundtable()">summon roundtable</button>
+    </div>
   </div>
   <div id="chat">
     <div id="header">
@@ -84,15 +103,86 @@ function switchTab(name) {
   else loadSessions();
 }
 
+let selectedPaths = new Set();
+
 async function loadPages(){
   const r = await fetch("/api/pages"); const j = await r.json();
   const el = document.getElementById("list"); el.innerHTML = "";
   j.forEach(p => {
     const d = document.createElement("div"); d.className="pageItem";
     d.textContent = p.path;
-    d.onclick = () => summon(p.path);
+    d.dataset.path = p.path;
+    d.onclick = () => togglePageSelection(p.path, d);
+    d.ondblclick = () => singleSummonOnDoubleClick(p.path);
     el.appendChild(d);
   });
+  updateModeRow();
+}
+
+function togglePageSelection(path, el){
+  if (selectedPaths.has(path)){
+    selectedPaths.delete(path);
+    el.classList.remove("selected");
+  } else {
+    if (selectedPaths.size === 0){
+      // First selection: still allow single-summon shortcut on single click
+      // by keeping the legacy summon path available. Track selection visually.
+      selectedPaths.add(path);
+      el.classList.add("selected");
+    } else if (selectedPaths.size >= 8){
+      toast("max 8 personas per roundtable");
+      return;
+    } else {
+      selectedPaths.add(path);
+      el.classList.add("selected");
+    }
+  }
+  updateModeRow();
+}
+
+function updateModeRow(){
+  const row = document.getElementById("modeRow");
+  if (selectedPaths.size >= 2){
+    row.classList.add("visible");
+  } else {
+    row.classList.remove("visible");
+  }
+}
+
+function singleSummonOnDoubleClick(path){
+  selectedPaths.clear();
+  document.querySelectorAll(".pageItem.selected").forEach(el => el.classList.remove("selected"));
+  summon(path);  // legacy single-page summon (Phase-10a path)
+}
+
+async function summonRoundtable(){
+  if (selectedPaths.size < 2){ toast("pick at least 2 pages"); return; }
+  const mode = document.getElementById("modeSelect").value;
+  const paths = [...selectedPaths];
+
+  // Cost-disclaimer for free-for-all with ≥3 personas
+  if (mode === "freeforall" && paths.length >= 3){
+    const ok = confirm(`Free-for-all with ${paths.length} personas: ~${paths.length}× token cost per turn. Continue?`);
+    if (!ok) return;
+  }
+
+  const r = await fetch("/api/summon", {
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body: JSON.stringify({paths, mode}),
+  });
+  if (!r.ok){ toast("summon failed: " + r.status); return; }
+  const j = await r.json();
+  sid = j.session_id;
+  document.getElementById("who").textContent = `${mode} session with ${paths.length} personas`;
+  document.getElementById("log").innerHTML = "";
+  document.getElementById("txt").disabled = false;
+  document.getElementById("send").disabled = false;
+  document.getElementById("exportBtn").disabled = false;
+  // Clear selection
+  selectedPaths.clear();
+  document.querySelectorAll(".pageItem.selected").forEach(el => el.classList.remove("selected"));
+  updateModeRow();
 }
 
 async function loadSessions(){
@@ -130,6 +220,13 @@ async function loadSessionIntoChat(sessionId, pagePath){
       } catch(e) {
         appendMsg("assistant", "(unreadable tool event)");
       }
+    } else if (m.role === "assistant" && m.persona_path){
+      // Phase-10b: render roundtable assistant rows with persona label
+      appendPersonaBubble({
+        persona_path: m.persona_path,
+        text: m.content,
+        color: hashColorJs(m.persona_path),
+      });
     } else {
       appendMsg(m.role, m.content);
     }
@@ -137,6 +234,14 @@ async function loadSessionIntoChat(sessionId, pagePath){
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
   document.getElementById("exportBtn").disabled = false;
+}
+
+// Mirror Python hash_color() so historical replays show same colors as live.
+function hashColorJs(path){
+  const palette = ["#7adfd5","#a8e6cf","#c9b3ff","#ffd3a5","#fda4af","#fde68a","#bbf7d0","#a5d8ff"];
+  let h = 0;
+  for (let i = 0; i < path.length; i++) h += path.charCodeAt(i);
+  return palette[h % palette.length];
 }
 
 async function summon(path){
@@ -184,13 +289,34 @@ document.getElementById("form").onsubmit = async (ev) => {
   if (Array.isArray(j.tool_events)) {
     j.tool_events.forEach((te, idx) => appendToolEvent(te, idx, j.tool_events.length));
   }
-  appendMsg("assistant", j.reply || "(no reply)");
+  // Phase-10b: replies array (roundtable) takes priority over reply (single-mode)
+  if (Array.isArray(j.replies)){
+    j.replies.forEach(rep => appendPersonaBubble(rep));
+  } else {
+    appendMsg("assistant", j.reply || "(no reply)");
+  }
 };
 
 function appendMsg(role, text){
   const log = document.getElementById("log");
   const d = document.createElement("div"); d.className="msg "+role; d.textContent = text;
   log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+
+function appendPersonaBubble(rep){
+  const log = document.getElementById("log");
+  const d = document.createElement("div");
+  d.className = "msg persona";
+  d.style.borderLeftColor = rep.color || "#4a8";
+  const labelEl = document.createElement("div");
+  labelEl.className = "personaLabel";
+  labelEl.textContent = (rep.persona_path || "").split("/").pop().replace(/\.md$/, "");
+  const textEl = document.createElement("div");
+  textEl.textContent = rep.text || "";
+  d.appendChild(labelEl);
+  d.appendChild(textEl);
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
 }
 
 function appendToolEvent(ev, idx, total){
