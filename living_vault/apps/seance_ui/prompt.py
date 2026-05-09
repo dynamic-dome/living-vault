@@ -37,6 +37,13 @@ outside that scope, respond honestly: "Das wusste ich damals nicht." /
 5. Keep answers short and reflective; you are a memory, not an oracle.
 """
 
+_REQUIRED_VOICE_FEATURE_KEYS = frozenset({
+    "avg_sentence_length",
+    "sentence_length_stddev",
+    "question_rate",
+    "first_person_rate",
+})
+
 
 def _format_phrases(phrases: list[str] | None) -> str:
     if not phrases:
@@ -49,10 +56,15 @@ def build_voice_block(persona: dict) -> str:
     """Three cases:
     A — voice_distilled present  → use it as opener + stylistic markers
     B — only voice_features      → list stylistic markers
-    C — neither                  → fallback notice
+    C — neither, or features missing required keys → fallback notice
     """
     distilled = persona.get("voice_distilled")
     features = persona.get("voice_features")
+
+    # Defensive: if features is present but malformed (missing required keys),
+    # fall through to Case C rather than raising KeyError.
+    if features is not None and not _REQUIRED_VOICE_FEATURE_KEYS.issubset(features):
+        features = None
 
     if distilled and features:
         return (

@@ -1,0 +1,8 @@
+{
+  "wiki_root": "C:/Users/domes/wiki",
+  "project_id": "living-vault",
+  "project_aliases": ["living-vault"],
+  "sync_enabled": true,
+  "session_note_threshold": 2,
+  "default_entrypoints": []
+}

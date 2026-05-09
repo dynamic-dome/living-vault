@@ -95,3 +95,15 @@ def test_system_prompt_handles_empty_themes():
     out = build_system_prompt(p, neighbor_titles=[])
     assert "x.md" in out
     assert "no extracted voice profile" in out.lower()
+
+
+def test_voice_block_falls_back_when_features_missing_required_keys():
+    """Defensive: a malformed voice_features dict (missing required keys)
+    must NOT crash with KeyError — fall through to Case C."""
+    p = _persona_full()
+    p["voice_distilled"] = None
+    # remove a required key
+    p["voice_features"] = {k: v for k, v in p["voice_features"].items() if k != "avg_sentence_length"}
+    block = build_voice_block(p)
+    # falls through to Case C
+    assert "no extracted voice profile" in block.lower()
