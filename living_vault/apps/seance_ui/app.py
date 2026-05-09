@@ -16,6 +16,10 @@ from living_vault.core.graph import neighbors as graph_neighbors
 from living_vault.apps.seance_ui.prompt import build_system_prompt
 from living_vault.apps.seance_ui.llm import get_llm
 from living_vault.apps.seance_ui import store
+from living_vault.apps.seance_ui.neighbors import (
+    CONSULT_NEIGHBOR_TOOL_DEF,
+    make_consult_neighbor_handler,
+)
 
 
 def _vault_root() -> Path:
@@ -122,11 +126,6 @@ def say(req: SayReq) -> dict:
     # Persist user turn first so it's in DB even if the LLM call fails.
     store.add_message(_db_path(), req.session_id, "user", req.text, persona_path=None)
 
-    # Build the tool-use loop infrastructure.
-    from living_vault.apps.seance_ui.neighbors import (
-        CONSULT_NEIGHBOR_TOOL_DEF,
-        make_consult_neighbor_handler,
-    )
     raw_handler = make_consult_neighbor_handler(
         vault_root=_vault_root(),
         db_path=_db_path(),
@@ -135,11 +134,15 @@ def say(req: SayReq) -> dict:
         allowlist=set(nbs),
     )
 
+    # tool_events are a thin response-shape projection of the rows persisted in
+    # seance_messages by raw_handler. Response carries {chars} or {error}; the
+    # full DB row also has {title, calls_used} for successes. If the LLM-loop
+    # raises mid-call, already-captured events are lost from the response but
+    # remain in the DB — acceptable for Phase 10a.
     tool_events: list[dict] = []
 
     def handler_with_capture(name: str, args: dict):
         result = raw_handler(name, args)
-        # Capture every call (success or is_error) for the response.
         if isinstance(result, dict) and result.get("is_error"):
             tool_events.append({
                 "tool_name": name,
@@ -147,7 +150,6 @@ def say(req: SayReq) -> dict:
                 "tool_result_summary": {"error": result["content"]},
             })
         else:
-            # Successful call — pull the matching summary from the DB row we just wrote.
             tool_events.append({
                 "tool_name": name,
                 "tool_args": args,

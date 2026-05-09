@@ -13,11 +13,14 @@ from living_vault.apps.seance_ui import store
 def _client_with_scripted_llm(vault: Path, db: Path, monkeypatch, script: list[dict]):
     monkeypatch.setenv("LIVING_VAULT_ROOT", str(vault))
     monkeypatch.setenv("LIVING_VAULT_DB", str(db))
-    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")  # forces FakeLLM by default
+    # Belt-and-suspenders: env var forces FakeLLM if monkeypatch below ever
+    # fails to take effect (e.g. import-order regression). Prevents accidental
+    # real Anthropic calls during tests.
+    monkeypatch.setenv("LIVING_VAULT_FAKE_LLM", "1")
     from importlib import reload
     from living_vault.apps.seance_ui import app as app_mod
     reload(app_mod)
-    # override get_llm to return our scripted fake
+    # The real override: get_llm returns our scripted FakeLLMWithTools.
     fake = FakeLLMWithTools(script)
     monkeypatch.setattr(app_mod, "get_llm", lambda: fake)
     return TestClient(app_mod.app), fake
@@ -100,15 +103,23 @@ def test_say_with_non_neighbor_tool_call_records_is_error(vault_copy, db_path, m
     r = client.post("/api/say", json={"session_id": sid, "text": "tell me about the unrelated"})
     assert r.status_code == 200
     body = r.json()
-    # tool_events list contains an entry recording the rejection (is_error=True payload)
-    assert len(body["tool_events"]) >= 0  # impl may choose to surface or not
+    # rejection MUST be captured: exactly one tool_events entry with is_error
+    assert len(body["tool_events"]) == 1
+    ev = body["tool_events"][0]
+    assert ev["tool_name"] == "consult_neighbor"
+    assert ev["tool_args"]["neighbor_path"] == "concepts/totally-unrelated.md"
+    assert "error" in ev["tool_result_summary"]
+    assert "not a neighbor" in ev["tool_result_summary"]["error"].lower()
     assert "answer" in body["reply"].lower() or "had to" in body["reply"].lower()
 
 
-def test_say_soft_cap_end_to_end(vault_copy, db_path, monkeypatch):
+def test_say_max_iterations_cap_limits_loop(vault_copy, db_path, monkeypatch):
+    """The LLM-loop max_iterations=5 takes effect FIRST, before the handler's
+    MAX_CONSULT_CALLS_PER_TURN=10 budget. A script with 11 tool_use steps will
+    only see 5 actually executed because the loop short-circuits at iteration
+    5 with the budget-exhausted fallback string."""
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
-    # 11 tool_use steps then a text — handler will return is_error from #11 onwards
     script = [
         {"type": "tool_use", "name": "consult_neighbor",
          "input": {"neighbor_path": "concepts/note-b.md"}}
@@ -119,12 +130,59 @@ def test_say_soft_cap_end_to_end(vault_copy, db_path, monkeypatch):
     r = client.post("/api/say", json={"session_id": sid, "text": "consult everything"})
     assert r.status_code == 200
     body = r.json()
-    # at most MAX_CONSULT_CALLS_PER_TURN successful tool_events were persisted
+    # max_iterations=5 (hardcoded in say()) caps tool calls at 5
     detail = store.get_session_detail(db_path, sid)
+    tool_rows = [m for m in detail["messages"] if m["role"] == "tool_use"]
     successful = [
-        m for m in detail["messages"]
-        if m["role"] == "tool_use"
-        and "error" not in json.loads(m["content"])["tool_result_summary"]
+        m for m in tool_rows
+        if "error" not in json.loads(m["content"])["tool_result_summary"]
     ]
+    assert len(successful) == 5
+    # response also captures exactly 5 events (no error events because the
+    # loop just stops, it doesn't call the handler with a budget-rejection)
+    assert len(body["tool_events"]) == 5
+    # the reply is the budget-exhausted fallback string from FakeLLMWithTools
+    assert "budget exhausted" in body["reply"].lower()
+
+
+def test_say_soft_cap_when_iterations_is_high_enough(vault_copy, db_path, monkeypatch):
+    """When the LLM-loop is generous enough (we monkey-patch say() to use a
+    larger max_iterations), the handler's MAX_CONSULT_CALLS_PER_TURN=10 budget
+    becomes the binding constraint. The 11th call returns is_error from the
+    soft-cap path and that error event surfaces in the response."""
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    script = [
+        {"type": "tool_use", "name": "consult_neighbor",
+         "input": {"neighbor_path": "concepts/note-b.md"}}
+        for _ in range(11)
+    ] + [{"type": "text", "text": "I have read enough."}]
+    client, fake = _client_with_scripted_llm(vault_copy, db_path, monkeypatch, script)
+
+    # Patch the FakeLLMWithTools instance to report a higher iteration cap so
+    # the soft-cap (handler-level) becomes the binding constraint, not the
+    # LLM-loop cap. We do this by overriding respond_with_tools on the fake
+    # to force max_iterations=15.
+    original = fake.respond_with_tools
+    def _generous(system, history, tools, tool_handler, max_iterations=5):
+        return original(system, history, tools, tool_handler, max_iterations=15)
+    fake.respond_with_tools = _generous
+
+    sid = client.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+    r = client.post("/api/say", json={"session_id": sid, "text": "consult everything"})
+    assert r.status_code == 200
+    body = r.json()
     from living_vault.apps.seance_ui.neighbors import MAX_CONSULT_CALLS_PER_TURN
-    assert len(successful) <= MAX_CONSULT_CALLS_PER_TURN
+    detail = store.get_session_detail(db_path, sid)
+    tool_rows = [m for m in detail["messages"] if m["role"] == "tool_use"]
+    successful = [
+        m for m in tool_rows
+        if "error" not in json.loads(m["content"])["tool_result_summary"]
+    ]
+    # Now 10 calls succeed, the 11th hits the soft-cap inside the handler.
+    assert len(successful) == MAX_CONSULT_CALLS_PER_TURN
+    # response captures all 11 (10 success + 1 soft-cap rejection)
+    assert len(body["tool_events"]) == 11
+    is_error_events = [ev for ev in body["tool_events"] if "error" in ev["tool_result_summary"]]
+    assert len(is_error_events) == 1
+    assert "budget" in is_error_events[0]["tool_result_summary"]["error"].lower()
