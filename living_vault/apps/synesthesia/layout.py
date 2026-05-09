@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from living_vault.core import db as db_mod
+from living_vault.core.privacy import public_pages
 
 
 def _pca_3d(matrix: np.ndarray, scale: float = 100.0) -> np.ndarray:
@@ -36,13 +37,23 @@ def _pca_3d(matrix: np.ndarray, scale: float = 100.0) -> np.ndarray:
 
 
 def compute_layout(
-    db_path: Path, public_only: bool = False
+    db_path: Path,
+    public_only: bool = False,
+    allowlist: list[str] | None = None,
 ) -> tuple[list[dict], list[dict]]:
     con = db_mod.connect(db_path)
     try:
         if public_only:
+            if allowlist is not None:
+                allowed_paths = public_pages(con, allowlist)
+            else:
+                allowed_paths = public_pages(con)
+            if not allowed_paths:
+                return [], []
+            placeholders = ",".join("?" * len(allowed_paths))
             page_rows = con.execute(
-                "SELECT path, title, mtime, is_public FROM pages WHERE is_public = 1 ORDER BY path"
+                f"SELECT path, title, mtime, is_public FROM pages WHERE path IN ({placeholders}) ORDER BY path",
+                allowed_paths,
             ).fetchall()
         else:
             page_rows = con.execute(
