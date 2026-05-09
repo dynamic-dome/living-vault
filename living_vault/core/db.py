@@ -69,6 +69,20 @@ CREATE TABLE IF NOT EXISTS seance_messages (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_seance_msgs_session ON seance_messages(session_id);
+
+-- Phase-12: Insights persisted from séance sessions (or standalone).
+CREATE TABLE IF NOT EXISTS insights (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_path     TEXT NOT NULL,
+    persona_path  TEXT NOT NULL,
+    question      TEXT NOT NULL,
+    insight       TEXT NOT NULL,
+    session_id    INTEGER REFERENCES seance_sessions(id),
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_insights_page    ON insights(page_path);
+CREATE INDEX IF NOT EXISTS idx_insights_persona ON insights(persona_path);
+CREATE INDEX IF NOT EXISTS idx_insights_session ON insights(session_id);
 """
 
 
