@@ -1,7 +1,6 @@
 """Persistence for séance conversations."""
 from __future__ import annotations
 import json as _json
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
