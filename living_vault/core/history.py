@@ -81,6 +81,7 @@ def _git_log_for_path(vault_root: Path, relpath: str, limit: int) -> list[dict]:
         proc = subprocess.run(
             [
                 "git", "-C", str(git_root), "log",
+                "--follow",  # Phase 13.x: track history across renames
                 "-n", str(limit),
                 f"--format={fmt}",
                 "--",

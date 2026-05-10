@@ -150,3 +150,52 @@ def test_limit_caps_at_max(tmp_repo: Path):
 def test_limit_below_one_clamped_to_one(tmp_repo: Path):
     rows = history_mod.page_history(tmp_repo, "concepts/foo.md", limit=0)
     assert len(rows) == 1
+
+
+def test_follow_tracks_history_across_rename(tmp_path: Path):
+    """Phase 13.x: --follow makes history span the rename boundary.
+
+    Setup: 2 commits on old.md, then `git mv old.md new.md`, then 1 commit on new.md.
+    page_history(new.md) must return 4 rows (initial + edit + rename + post-rename).
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "--local", "user.email", "test@example.com")
+    _git(repo, "config", "--local", "user.name", "Test User")
+    _git(repo, "config", "--local", "commit.gpgsign", "false")
+
+    # Two commits on the old name. Body identical-ish so git's rename-detection
+    # has high confidence after `git mv`.
+    old_path = repo / "concepts" / "old.md"
+    old_path.parent.mkdir(parents=True)
+    old_path.write_text("line1\nline2\nline3\n", encoding="utf-8")
+    _git(repo, "add", "concepts/old.md")
+    _git(repo, "commit", "-q", "-m", "create old name")
+
+    old_path.write_text("line1\nline2\nline3\nline4\n", encoding="utf-8")
+    _git(repo, "add", "concepts/old.md")
+    _git(repo, "commit", "-q", "-m", "edit before rename")
+
+    # Rename — git mv keeps the blob identity, so --follow detects 100% similarity.
+    _git(repo, "mv", "concepts/old.md", "concepts/new.md")
+    _git(repo, "commit", "-q", "-m", "rename old to new")
+
+    # One commit after the rename.
+    new_path = repo / "concepts" / "new.md"
+    new_path.write_text("line1\nline2\nline3\nline4\nline5\n", encoding="utf-8")
+    _git(repo, "add", "concepts/new.md")
+    _git(repo, "commit", "-q", "-m", "edit after rename")
+
+    history_mod.clear_cache()
+    rows = history_mod.page_history(repo, "concepts/new.md")
+
+    # Without --follow we'd see only 2 rows (after the rename). With --follow: 4.
+    subjects = [r["subject"] for r in rows]
+    assert "create old name" in subjects, (
+        f"--follow should surface pre-rename commits, got: {subjects}"
+    )
+    assert "edit before rename" in subjects
+    assert "rename old to new" in subjects
+    assert "edit after rename" in subjects
+    assert len(rows) == 4
