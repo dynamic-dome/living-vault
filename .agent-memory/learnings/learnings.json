@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "id": "L1",
+    "date": "2026-05-11",
+    "text": "Phase-13 deploy-public-vault.ps1 hatte -Vault Default auf $HOME\\wiki, aber pages.path in .vault-engine.db ist relativ zu $HOME\\wiki\\wiki gespeichert. Folge: vault_root\\relpath zeigte eine Ebene zu hoch, git log fand keine Commits, history.json war im Live-Vault leer. Tests sind alle gruen gewesen, weil sie mit Fixture-Repos arbeiten und vault_root explizit setzen. Real-Run-Sichtpruefung hat den Bug aufgedeckt — Lesson: phase-close-tests fangen Konfigurationsdefault-Bugs nicht.",
+    "importance": 4,
+    "tags": ["living-vault", "phase-13", "deploy", "config-default", "real-run-required"],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-05-11"
+  },
+  {
+    "id": "L2",
+    "date": "2026-05-11",
+    "text": "Living-Vault ist bereits ein generischer Vault-Reader, nicht an ~/wiki gebunden. CLI-Schnittstellen (vault-engine-mcp index --vault/--db, deploy-public-vault.ps1 -Vault/-Db/-Allowlist/-OutDir) akzeptieren beliebige Pfade. PoC am 2026-05-11 gegen kompetenz-wiki: 193 Pages, 840 Edges, 0 Errors, 0 Skipped, kein Code-Change. Bonus: vault-engine-mcp parsed nicht nur [[…]]-Wikilinks sondern auch Frontmatter-Felder supports/depends_on/applies_to als Edge-Quellen — kompetenz-wiki hat dadurch 4.35 Edges/Page Density (sehr graph-freundlich).",
+    "importance": 3,
+    "tags": ["living-vault", "multi-vault", "blueprint", "vault-engine-mcp", "edges"],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-05-11"
+  }
+]
