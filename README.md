@@ -2,7 +2,9 @@
 
 Vault engine + 3 consumers: Synesthesia (3D), Séance (chat), Living-Portfolio (site).
 
-See `docs/plans/2026-05-08-living-vault-master-plan.md` and `docs/superpowers/specs/2026-05-08-living-vault-trio-design.md`.
+**Erst hier lesen:** [`HOW-TO-USE.md`](HOW-TO-USE.md) — Index/Wegweiser durch die drei Konsumenten, Multi-Vault-Setup, Troubleshooting.
+
+Weiterfuehrend: `docs/plans/2026-05-08-living-vault-master-plan.md` (Master-Plan, 14 Phasen ✅) und `docs/superpowers/specs/2026-05-08-living-vault-trio-design.md` (Architektur-Spec).
 
 ## Setup
 
