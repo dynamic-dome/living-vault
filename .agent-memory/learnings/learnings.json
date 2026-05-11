@@ -18,5 +18,15 @@
     "layer": "short-term",
     "superseded_by": null,
     "last_relevant": "2026-05-11"
+  },
+  {
+    "id": "L3",
+    "date": "2026-05-11",
+    "text": "User-Konvention 2026-05-11: jedes Projekt MUSS im Root CLAUDE.md (Agent-Konventionen, max ~40 Zeilen, verweist auf HOW-TO-USE.md) und HOW-TO-USE.md (Index/Wegweiser fuer User und Agent, verlinkt docs/*.md statt zu duplizieren). README bleibt minimal. Globale Regel in ~/.claude/CLAUDE.md Block 'Projekt-Eintrittspunkt' eingetragen + Memory-Backup mit User-Originaltext gepinnt. Referenz-Implementierung: living-vault Commits 6095c25 (CLAUDE.md) + 8fe90af (HOW-TO-USE.md). Bei Session-Start in fremden Projekten ohne diese Dateien: proaktiv fragen ob anlegen.",
+    "importance": 5,
+    "tags": ["user-konvention", "projekt-doku", "claude-md", "how-to-use", "session-start"],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-05-11"
   }
 ]
