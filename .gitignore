@@ -13,3 +13,5 @@ dist/
 *.log
 .DS_Store
 node_modules/
+out-vault/
+bash.exe.stackdump

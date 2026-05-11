@@ -10,7 +10,11 @@
 #   ./scripts/deploy-public-vault.ps1 -DeployTarget 'C:\path\to\host\source'
 
 param(
-    [string]$Vault     = "$HOME\wiki",
+    # Inner wiki content root — matches the convention used by LIVING_VAULT_ROOT
+    # and the allowlist (relpaths are relative to this directory, not $HOME\wiki).
+    # Using $HOME\wiki here breaks Phase-13 history.json (git log finds no commits
+    # because vault_root/relpath then points one directory above the actual files).
+    [string]$Vault     = "$HOME\wiki\wiki",
     [string]$Db        = "$HOME\wiki\.vault-engine.db",
     [string]$Allowlist = "$PSScriptRoot\..\docs\public-allowlist.txt",
     [string]$OutDir    = "$PSScriptRoot\..\out-vault",

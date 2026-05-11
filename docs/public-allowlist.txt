@@ -1,6 +1,7 @@
 # Phase-11 Public-Vault Allowlist
 # ================================
-# Eine Wiki-relpath pro Zeile (relativ zu ~/wiki).
+# Eine Wiki-relpath pro Zeile (relativ zu ~/wiki/wiki, dem Vault-Content-Root —
+# identisch mit den `pages.path`-Eintraegen in `.vault-engine.db`).
 # # = Kommentar, Leerzeilen erlaubt.
 #
 # Erste Auswahl 2026-05-09: 10 zentrale, in sich geschlossene Pages aus
