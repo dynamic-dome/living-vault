@@ -196,3 +196,37 @@ def test_phase_10b_migrations_idempotent(tmp_path: Path):
     )}
     assert "seance_session_personas" in tables
     con.close()
+
+
+def test_initialize_adds_content_hash_to_legacy_embeddings_blob(tmp_path: Path):
+    db_path = tmp_path / ".vault-engine.db"
+    con = sqlite3.connect(str(db_path))
+    con.executescript("""
+        CREATE TABLE embeddings_blob (
+            path     TEXT PRIMARY KEY,
+            model    TEXT NOT NULL,
+            dim      INTEGER NOT NULL,
+            vector   BLOB NOT NULL
+        );
+    """)
+    con.execute(
+        "INSERT INTO embeddings_blob(path, model, dim, vector) VALUES (?, ?, ?, ?)",
+        ("legacy.md", "numpy-hashbag", 1, b"\x00\x00\x00\x00"),
+    )
+    con.commit()
+    con.close()
+
+    db_mod.initialize(db_path)
+    db_mod.initialize(db_path)
+
+    con = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(embeddings_blob)")}
+    assert "content_hash" in cols
+    row = con.execute(
+        "SELECT path, model, content_hash FROM embeddings_blob WHERE path = ?",
+        ("legacy.md",),
+    ).fetchone()
+    assert row[0] == "legacy.md"
+    assert row[1] == "numpy-hashbag"
+    assert row[2] is None
+    con.close()

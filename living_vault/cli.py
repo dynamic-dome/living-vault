@@ -1,6 +1,7 @@
 """Top-level CLI for living-vault."""
 from __future__ import annotations
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -33,6 +34,149 @@ def index_cmd(vault: str, db: str, no_embed: bool) -> None:
     if not no_embed:
         n = index_embeddings(vault_p, db_p)
         click.echo(f"embeddings updated={n}")
+
+
+def _table_exists(con: sqlite3.Connection, table: str) -> bool:
+    row = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def _columns(con: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
+
+
+def _status_payload(db_p: Path) -> dict[str, object]:
+    if not db_p.exists():
+        return {
+            "status": "missing-db",
+            "pages_total": 0,
+            "links_total": 0,
+            "embeddings_total": 0,
+            "current": 0,
+            "stale": 0,
+            "unknown": 0,
+            "missing": 0,
+            "orphan": 0,
+            "models": [],
+        }
+
+    con = db_mod.connect(db_p)
+    try:
+        required_tables = {"pages", "links", "embeddings_blob"}
+        missing_tables = [t for t in sorted(required_tables) if not _table_exists(con, t)]
+        embedding_columns = _columns(con, "embeddings_blob") if not missing_tables else set()
+        legacy_schema = bool(missing_tables) or "content_hash" not in embedding_columns
+        if legacy_schema:
+            return {
+                "status": "legacy-schema",
+                "pages_total": 0,
+                "links_total": 0,
+                "embeddings_total": 0,
+                "current": 0,
+                "stale": 0,
+                "unknown": 0,
+                "missing": 0,
+                "orphan": 0,
+                "models": [],
+                "missing_tables": missing_tables,
+            }
+
+        pages_total = con.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
+        links_total = con.execute("SELECT COUNT(*) FROM links").fetchone()[0]
+        embeddings_total = con.execute("SELECT COUNT(*) FROM embeddings_blob").fetchone()[0]
+        current = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM embeddings_blob e
+            JOIN pages p ON p.path = e.path
+            WHERE e.content_hash = p.content_hash
+            """
+        ).fetchone()[0]
+        unknown = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM embeddings_blob e
+            JOIN pages p ON p.path = e.path
+            WHERE e.content_hash IS NULL
+            """
+        ).fetchone()[0]
+        stale = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM embeddings_blob e
+            JOIN pages p ON p.path = e.path
+            WHERE e.content_hash IS NOT NULL AND e.content_hash != p.content_hash
+            """
+        ).fetchone()[0]
+        missing = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM pages p
+            LEFT JOIN embeddings_blob e ON e.path = p.path
+            WHERE e.path IS NULL
+            """
+        ).fetchone()[0]
+        orphan = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM embeddings_blob e
+            LEFT JOIN pages p ON p.path = e.path
+            WHERE p.path IS NULL
+            """
+        ).fetchone()[0]
+        models = [
+            row["model"]
+            for row in con.execute(
+                "SELECT DISTINCT model FROM embeddings_blob ORDER BY model"
+            )
+        ]
+        status = "ok"
+        if stale or unknown or missing or orphan:
+            status = "needs-reembed"
+        return {
+            "status": status,
+            "pages_total": pages_total,
+            "links_total": links_total,
+            "embeddings_total": embeddings_total,
+            "current": current,
+            "stale": stale,
+            "unknown": unknown,
+            "missing": missing,
+            "orphan": orphan,
+            "models": models,
+        }
+    finally:
+        con.close()
+
+
+@cli.command("status")
+@click.option("--db", required=True, type=click.Path())
+@click.option("--json", "json_output", is_flag=True, help="print machine-readable JSON")
+def status_cmd(db: str, json_output: bool) -> None:
+    """Report DB and embedding freshness without loading an embedding model."""
+    payload = _status_payload(Path(db))
+    if json_output:
+        click.echo(json.dumps(payload, sort_keys=True))
+    else:
+        models = ",".join(payload["models"]) if payload["models"] else "-"
+        fields = [
+            f"status={payload['status']}",
+            f"pages_total={payload['pages_total']}",
+            f"links_total={payload['links_total']}",
+            f"embeddings_total={payload['embeddings_total']}",
+            f"current={payload['current']}",
+            f"stale={payload['stale']}",
+            f"unknown={payload['unknown']}",
+            f"missing={payload['missing']}",
+            f"orphan={payload['orphan']}",
+            f"models={models}",
+        ]
+        click.echo(" ".join(fields))
+    if payload["status"] in {"missing-db", "legacy-schema"}:
+        raise click.exceptions.Exit(1)
 
 
 # ~ Phase-9 ~

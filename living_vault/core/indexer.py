@@ -41,6 +41,7 @@ def index_vault(vault_root: Path, db_path: Path) -> dict[str, int]:
         for p in gone:
             con.execute("DELETE FROM pages WHERE path = ?", (p,))
             con.execute("DELETE FROM links WHERE from_path = ?", (p,))
+            con.execute("DELETE FROM embeddings_blob WHERE path = ?", (p,))
         con.execute(
             "INSERT INTO runs(started_at, finished_at, action, pages_seen, pages_updated) "
             "VALUES (?, ?, ?, ?, ?)",

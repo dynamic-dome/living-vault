@@ -3,6 +3,7 @@ import pytest
 from living_vault.core.embeddings import (
     NumpyBackend, get_backend, BackendNotAvailable,
 )
+from living_vault.core import embeddings as embeddings_mod
 
 
 def test_numpy_backend_encode_returns_normalized():
@@ -38,7 +39,10 @@ from living_vault.core.indexer import index_vault
 from living_vault.core.embeddings import index_embeddings, similar
 
 
-def test_index_embeddings_persists_all(vault_copy: Path, db_path: Path):
+def test_index_embeddings_persists_all(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
     n = index_embeddings(vault_copy, db_path)
@@ -49,7 +53,10 @@ def test_index_embeddings_persists_all(vault_copy: Path, db_path: Path):
     assert cnt == 3
 
 
-def test_similar_returns_self_first(vault_copy: Path, db_path: Path):
+def test_similar_returns_self_first(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
     index_embeddings(vault_copy, db_path)
@@ -60,7 +67,10 @@ def test_similar_returns_self_first(vault_copy: Path, db_path: Path):
     assert abs(res[0][1] - 1.0) < 1e-3
 
 
-def test_index_embeddings_skip_unchanged(vault_copy: Path, db_path: Path):
+def test_index_embeddings_skip_unchanged(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
     n1 = index_embeddings(vault_copy, db_path)
@@ -69,10 +79,64 @@ def test_index_embeddings_skip_unchanged(vault_copy: Path, db_path: Path):
     assert n2 == 0
 
 
+def test_index_embeddings_recomputes_changed_page(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    assert index_embeddings(vault_copy, db_path) == 3
+
+    changed = vault_copy / "concepts" / "note-a.md"
+    changed.write_text(
+        changed.read_text(encoding="utf-8") + "\n\nChanged embedding source.\n",
+        encoding="utf-8",
+    )
+
+    stats = index_vault(vault_copy, db_path)
+    assert stats["pages_updated"] == 1
+    assert index_embeddings(vault_copy, db_path) == 1
+
+    con = db_mod.connect(db_path)
+    row = con.execute(
+        """
+        SELECT e.content_hash AS embedding_hash, p.content_hash AS page_hash
+        FROM embeddings_blob e
+        JOIN pages p ON p.path = e.path
+        WHERE e.path = ?
+        """,
+        ("concepts/note-a.md",),
+    ).fetchone()
+    con.close()
+    assert row["embedding_hash"] == row["page_hash"]
+
+
+def test_index_embeddings_recomputes_legacy_unknown_hash(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    assert index_embeddings(vault_copy, db_path) == 3
+
+    con = db_mod.connect(db_path)
+    con.execute(
+        "UPDATE embeddings_blob SET content_hash = NULL WHERE path = ?",
+        ("concepts/note-a.md",),
+    )
+    con.commit()
+    con.close()
+
+    assert index_embeddings(vault_copy, db_path) == 1
+
+
 from living_vault.core.embeddings import search_semantic
 
 
-def test_search_semantic_returns_results(vault_copy: Path, db_path: Path):
+def test_search_semantic_returns_results(
+    vault_copy: Path, db_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
     index_embeddings(vault_copy, db_path)

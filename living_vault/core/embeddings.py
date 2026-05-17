@@ -97,36 +97,30 @@ def index_embeddings(vault_root: Path, db_path: Path) -> int:
     backend = get_backend()
     con = db_mod.connect(db_path)
     try:
-        # existing embeddings: path -> model name
+        # existing embeddings: path -> (model name, source content hash)
         existing = {
-            row["path"]: row["model"]
-            for row in con.execute("SELECT path, model FROM embeddings_blob")
-        }
-        # current content hashes from pages table
-        page_hashes = {
-            row["path"]: row["content_hash"]
-            for row in con.execute("SELECT path, content_hash FROM pages")
+            row["path"]: (row["model"], row["content_hash"])
+            for row in con.execute("SELECT path, model, content_hash FROM embeddings_blob")
         }
         # find pages that need (re)embedding
-        candidates: list[tuple[str, str]] = []  # (relpath, body)
+        candidates: list[tuple[str, str, str]] = []  # (relpath, body, content_hash)
         for page in walk_vault(vault_root):
-            stored_model = existing.get(page.relpath)
+            stored = existing.get(page.relpath)
             need = True
-            if stored_model == backend.name:
-                # same model — skip only if content_hash matches pages table
-                stored_hash = page_hashes.get(page.relpath)
-                if stored_hash is not None and stored_hash == page.content_hash_value:
+            if stored is not None:
+                stored_model, stored_hash = stored
+                if stored_model == backend.name and stored_hash == page.content_hash_value:
                     need = False
             if need:
-                candidates.append((page.relpath, page.body))
+                candidates.append((page.relpath, page.body, page.content_hash_value))
         if not candidates:
             return 0
-        vecs = backend.encode([b for _, b in candidates])
-        for (relpath, _), v in zip(candidates, vecs):
+        vecs = backend.encode([b for _, b, _ in candidates])
+        for (relpath, _, content_hash), v in zip(candidates, vecs):
             con.execute(
-                "INSERT OR REPLACE INTO embeddings_blob(path, model, dim, vector) "
-                "VALUES (?, ?, ?, ?)",
-                (relpath, backend.name, backend.dim, _vec_to_blob(v)),
+                "INSERT OR REPLACE INTO embeddings_blob(path, model, dim, vector, content_hash) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (relpath, backend.name, backend.dim, _vec_to_blob(v), content_hash),
             )
         con.commit()
         return len(candidates)

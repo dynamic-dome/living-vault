@@ -3,6 +3,8 @@ from pathlib import Path
 import sqlite3
 
 from living_vault.core import db as db_mod
+from living_vault.core import embeddings as embeddings_mod
+from living_vault.core.embeddings import NumpyBackend, index_embeddings
 from living_vault.core.indexer import index_vault
 
 
@@ -46,3 +48,26 @@ def test_index_vault_skip_unchanged(vault_copy: Path, db_path: Path):
     stats2 = index_vault(vault_copy, db_path)
     assert stats2["pages_seen"] == 3
     assert stats2["pages_updated"] == 0  # nothing changed -> no updates
+
+
+def test_index_vault_deletes_embedding_for_removed_page(
+    vault_copy: Path, db_path: Path, monkeypatch
+):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+
+    removed_path = "concepts/note-a.md"
+    (vault_copy / removed_path).unlink()
+    stats = index_vault(vault_copy, db_path)
+
+    con = db_mod.connect(db_path)
+    page = con.execute("SELECT path FROM pages WHERE path = ?", (removed_path,)).fetchone()
+    embedding = con.execute(
+        "SELECT path FROM embeddings_blob WHERE path = ?", (removed_path,)
+    ).fetchone()
+    con.close()
+    assert stats["pages_gone"] == 1
+    assert page is None
+    assert embedding is None

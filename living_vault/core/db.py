@@ -48,10 +48,11 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 
 CREATE TABLE IF NOT EXISTS embeddings_blob (
-    path     TEXT PRIMARY KEY,
-    model    TEXT NOT NULL,
-    dim      INTEGER NOT NULL,
-    vector   BLOB NOT NULL
+    path          TEXT PRIMARY KEY,
+    model         TEXT NOT NULL,
+    dim           INTEGER NOT NULL,
+    vector        BLOB NOT NULL,
+    content_hash  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS seance_sessions (
@@ -103,6 +104,10 @@ _PHASE_10B_SEANCE_SESSIONS_COLUMNS = [
     ("mode", "TEXT NOT NULL DEFAULT 'single'"),
 ]
 
+_EMBEDDINGS_BLOB_COLUMNS = [
+    ("content_hash", "TEXT"),
+]
+
 _PHASE_10B_NEW_TABLES = """
 CREATE TABLE IF NOT EXISTS seance_session_personas (
     session_id   INTEGER NOT NULL REFERENCES seance_sessions(id),
@@ -139,6 +144,9 @@ def initialize(db_path: Path) -> None:
         for col, sqltype in _PHASE_10B_SEANCE_SESSIONS_COLUMNS:
             if not _column_exists(con, "seance_sessions", col):
                 con.execute(f"ALTER TABLE seance_sessions ADD COLUMN {col} {sqltype}")
+        for col, sqltype in _EMBEDDINGS_BLOB_COLUMNS:
+            if not _column_exists(con, "embeddings_blob", col):
+                con.execute(f"ALTER TABLE embeddings_blob ADD COLUMN {col} {sqltype}")
         con.commit()
     finally:
         con.close()
