@@ -14,6 +14,18 @@ def test_extract_wikilinks_with_alias():
     assert ("wiki/synthesis/abc", "the synthesis") in links
 
 
+def test_extract_wikilinks_handles_escaped_pipe_in_alias():
+    # Phase-11 follow-up #1: source markdown sometimes escapes the alias pipe
+    # as "\|". The escape backslash must NOT leak into the target path (which
+    # produced a broken edge "...barkhausenrauschen\.md" in the live DB).
+    body = "[[wiki/concepts/barkhausenrauschen\\|Barkhausenrauschen]]"
+    links = extract_wikilinks(body)
+    assert ("wiki/concepts/barkhausenrauschen", "Barkhausenrauschen") in links
+    # the backslash-tainted target must not appear at all
+    targets = [t for t, _ in links]
+    assert "wiki/concepts/barkhausenrauschen\\" not in targets
+
+
 def test_extract_wikilinks_ignores_non_wiki():
     body = "[[foo]] is not a wiki link, but [[wiki/x]] is."
     links = extract_wikilinks(body)

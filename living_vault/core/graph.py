@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-WIKILINK_RE = re.compile(r"\[\[(wiki/[^\]\|]+?)(?:\|([^\]]+))?\]\]")
+# The target group excludes "]", "|" and "\"; an optional "\" immediately
+# before the alias pipe is consumed but NOT captured, so an escaped alias
+# separator ("[[wiki/foo\|Alias]]") yields target "wiki/foo", not "wiki/foo\".
+WIKILINK_RE = re.compile(r"\[\[(wiki/[^\]\|\\]+?)\\?(?:\|([^\]]+))?\]\]")
 
 
 def extract_wikilinks(body: str) -> list[tuple[str, str | None]]:
