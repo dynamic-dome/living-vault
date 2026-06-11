@@ -9,6 +9,7 @@ from living_vault.core.indexer import index_vault
 from living_vault.apps.seance_ui.bundle import (
     SeanceExportError,
     build_seance_bundle,
+    validate_bundle_text,
     _load_demo,
 )
 
@@ -146,3 +147,89 @@ def test_neighbors_are_stripped_to_allowlist(indexed, tmp_path):
         persona_paths=["concepts/note-a.md"],
     )
     assert bundle2["personas"][0]["neighbors"] == ["concepts/note-b.md"]
+
+
+# ---------------------------------------------------------------------------
+# Task A3: validate_bundle_text
+# ---------------------------------------------------------------------------
+
+def test_validator_flags_machine_paths_and_secrets():
+    """Check 1: machine paths (Windows + POSIX) and secret-like keys are flagged."""
+    bad = json.dumps({
+        "a": "siehe C:/Users/domes/geheim.md",
+        "b": "/Users/alice/note",
+        "c": "key sk-ant-abc12345xyz",
+    })
+    findings = validate_bundle_text(bad)
+    assert len(findings) == 3
+    assert any("machine-path" in f for f in findings)
+    assert any("secret" in f for f in findings)
+
+
+def test_validator_passes_clean_public_content():
+    """Check 1: clean content with time-like colons and ratios must not be flagged."""
+    ok = json.dumps({
+        "a": "MCP-Server bauen: Transport via stdio, JSON-RPC 2.0.",
+        "b": "Zeitplan 10:30 Uhr, Verhältnis 1:5",
+    })
+    assert validate_bundle_text(ok) == []
+
+
+def test_validator_flags_wikilink_outside_allowlist():
+    """Check 2: body_excerpt with wikilink to page NOT in allowed → flagged."""
+    # note-a links to [[wiki/concepts/note-b]] → resolves to concepts/note-b.md
+    bundle_text = json.dumps({
+        "body_excerpt": "See [[wiki/concepts/note-b]] for more details.",
+    })
+    # Only note-a in allowlist, note-b is NOT allowed
+    allowed = {"concepts/note-a.md"}
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert len(findings) == 1
+    assert "wikilink outside allowlist" in findings[0]
+    assert "concepts/note-b.md" in findings[0]
+
+
+def test_validator_passes_wikilink_inside_allowlist():
+    """Check 2: wikilink to a page IN allowed → no finding."""
+    bundle_text = json.dumps({
+        "body_excerpt": "See [[wiki/concepts/note-b]] for more details.",
+    })
+    allowed = {"concepts/note-a.md", "concepts/note-b.md"}
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert findings == []
+
+
+def test_validator_skips_wikilink_check_when_allowed_is_none():
+    """Check 2: allowed=None → wikilink check is skipped entirely."""
+    bundle_text = json.dumps({
+        "body_excerpt": "See [[wiki/concepts/note-b]] and [[wiki/synthesis/syn-1]].",
+    })
+    # No allowlist provided → only pattern check runs, no wikilink findings
+    findings = validate_bundle_text(bundle_text, allowed=None)
+    assert all("wikilink" not in f for f in findings)
+
+
+def test_validator_flags_alias_form_wikilink_outside_allowlist():
+    """Check 2: alias form [[target|alias]] → target is checked, alias ignored."""
+    bundle_text = json.dumps({
+        "body_excerpt": "See [[wiki/synthesis/syn-1|the synthesis]] here.",
+    })
+    allowed = {"concepts/note-a.md", "concepts/note-b.md"}  # syn-1 NOT in allowed
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert len(findings) == 1
+    assert "wikilink outside allowlist" in findings[0]
+    assert "synthesis/syn-1.md" in findings[0]
+
+
+def test_validator_flags_secret_env_name():
+    """Check 1: ANTHROPIC_API_KEY in bundle text is flagged as secret env name."""
+    bad = json.dumps({"config": "export ANTHROPIC_API_KEY=abc123"})
+    findings = validate_bundle_text(bad)
+    assert any("secret env name" in f for f in findings)
+
+
+def test_validator_flags_posix_home_path():
+    """Check 1: /home/user path is flagged as machine-path (posix)."""
+    bad = json.dumps({"path": "/home/dominic/projects/secret"})
+    findings = validate_bundle_text(bad)
+    assert any("machine-path" in f for f in findings)
