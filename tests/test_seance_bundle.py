@@ -2,8 +2,13 @@
 from pathlib import Path
 
 import json
+import subprocess
+import sys
 import pytest
 
+from click.testing import CliRunner
+
+from living_vault.cli import cli
 from living_vault.core import db as db_mod
 from living_vault.core.indexer import index_vault
 from living_vault.apps.seance_ui.bundle import (
@@ -416,3 +421,68 @@ def test_validator_two_distinct_windows_paths_produce_two_findings():
     all_text = " ".join(windows_findings)
     assert "domes" in all_text, "domes path finding missing"
     assert "alice" in all_text, "alice path finding missing"
+
+
+# ---------------------------------------------------------------------------
+# Task A4: CLI export-seance-bundle command + entrypoint smoke
+# note-a body links to [[wiki/concepts/note-b]] → concepts/note-b.md
+#                    and [[wiki/synthesis/syn-1]]  → synthesis/syn-1.md
+# Both must be on the allowlist so the wikilink validator does not fire.
+# ---------------------------------------------------------------------------
+
+def test_cli_export_writes_bundle_and_aborts_on_findings(indexed, tmp_path):
+    """Happy path: clean bundle with all wikilink targets allowlisted → exit 0."""
+    vault, db = indexed
+    # note-a links to note-b and syn-1 — all three must be on allowlist
+    allow = _write_allowlist(
+        tmp_path,
+        ["concepts/note-a.md", "concepts/note-b.md", "synthesis/syn-1.md"],
+    )
+    out = tmp_path / "seance-bundle.json"
+    r = CliRunner().invoke(cli, [
+        "export-seance-bundle",
+        "--vault", str(vault), "--db", str(db),
+        "--allowlist", str(allow),
+        "--persona", "concepts/note-a.md",
+        "--out", str(out),
+    ])
+    assert r.exit_code == 0, r.output
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["personas"][0]["id"] == "concepts/note-a.md"
+
+
+def test_cli_export_fails_on_validator_finding(indexed, tmp_path):
+    """Validator gate: machine path injected into page body → exit non-zero, no output file."""
+    vault, db = indexed
+    # Plant a Windows machine path into note-a's body and re-index
+    page = vault / "concepts" / "note-a.md"
+    page.write_text(
+        page.read_text(encoding="utf-8") + "\n\nLokal: C:/Users/domes/x.md\n",
+        encoding="utf-8",
+    )
+    index_vault(vault, db)
+    allow = _write_allowlist(
+        tmp_path,
+        ["concepts/note-a.md", "concepts/note-b.md", "synthesis/syn-1.md"],
+    )
+    out = tmp_path / "bundle.json"
+    r = CliRunner().invoke(cli, [
+        "export-seance-bundle",
+        "--vault", str(vault), "--db", str(db),
+        "--allowlist", str(allow),
+        "--persona", "concepts/note-a.md",
+        "--out", str(out),
+    ])
+    assert r.exit_code != 0
+    assert "machine-path" in r.output
+    assert not out.exists()
+
+
+def test_cli_entrypoint_smoke_subprocess():
+    """Entrypoint smoke: python -m living_vault.cli export-seance-bundle --help works."""
+    r = subprocess.run(
+        [sys.executable, "-m", "living_vault.cli", "export-seance-bundle", "--help"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert r.returncode == 0
+    assert "allowlist" in r.stdout

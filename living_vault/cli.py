@@ -270,6 +270,46 @@ def extract_voice_cmd(vault: str, db: str, limit: int | None, force: bool, yes: 
         click.echo("Re-run extract-voice to retry failed pages.", err=True)
 
 
+@cli.command("export-seance-bundle")
+@click.option("--vault", required=True, type=click.Path(exists=True, file_okay=False))
+@click.option("--db", "db_path", required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option("--allowlist", required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option("--persona", "personas", multiple=True, required=True,
+              help="Relpath einer Persona-Page; 1-3x angeben. Muss auf der Allowlist stehen.")
+@click.option("--demo", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="JSON-Datei mit vorgenerierten Demo-Konversationen.")
+@click.option("--out", required=True, type=click.Path())
+def export_seance_bundle_cmd(vault, db_path, allowlist, personas, demo, out):
+    """Exportiert das public-safe Séance-Bundle für die Website."""
+    import json as _json
+    from pathlib import Path as _P
+
+    from living_vault.apps.seance_ui.bundle import (
+        SeanceExportError, build_seance_bundle, validate_bundle_text,
+    )
+    from living_vault.core.privacy import load_allowlist as _load_allowlist
+
+    try:
+        bundle = build_seance_bundle(
+            vault_root=_P(vault), db_path=_P(db_path),
+            allowlist_path=_P(allowlist), persona_paths=list(personas),
+            demo_path=_P(demo) if demo else None,
+        )
+        text = _json.dumps(bundle, ensure_ascii=False, indent=2)
+        findings = validate_bundle_text(text, allowed=set(_load_allowlist(_P(allowlist))))
+        if findings:
+            raise SeanceExportError(
+                "validator findings (export aborted):\n" + "\n".join(findings)
+            )
+    except SeanceExportError as exc:
+        raise click.ClickException(str(exc))
+    _P(out).write_text(text, encoding="utf-8")
+    click.echo(
+        f"wrote {out} ({len(bundle['personas'])} personas, "
+        f"{len(bundle['demo_conversations'])} demo conversations)"
+    )
+
+
 @cli.command("history")
 @click.argument("path")
 @click.option("--vault", required=True, type=click.Path(exists=True, file_okay=False))
