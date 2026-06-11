@@ -121,3 +121,28 @@ def test_duplicate_persona_paths_raises(indexed, tmp_path):
             vault_root=vault, db_path=db, allowlist_path=allow,
             persona_paths=["concepts/note-a.md", "concepts/note-a.md"],
         )
+
+
+# ---------------------------------------------------------------------------
+# Task A2: neighbor-stripping proof
+# note-a links to [[wiki/concepts/note-b]] → concepts/note-b.md
+#                 [[wiki/synthesis/syn-1]]  → synthesis/syn-1.md
+# ---------------------------------------------------------------------------
+
+def test_neighbors_are_stripped_to_allowlist(indexed, tmp_path):
+    vault, db = indexed
+    # Allowlist contains ONLY note-a → both outgoing neighbors must be stripped
+    allow = _write_allowlist(tmp_path, ["concepts/note-a.md"])
+    bundle = build_seance_bundle(
+        vault_root=vault, db_path=db, allowlist_path=allow,
+        persona_paths=["concepts/note-a.md"],
+    )
+    assert bundle["personas"][0]["neighbors"] == []
+
+    # With note-b also allowlisted, exactly it appears (syn-1 still stripped)
+    allow2 = _write_allowlist(tmp_path, ["concepts/note-a.md", "concepts/note-b.md"])
+    bundle2 = build_seance_bundle(
+        vault_root=vault, db_path=db, allowlist_path=allow2,
+        persona_paths=["concepts/note-a.md"],
+    )
+    assert bundle2["personas"][0]["neighbors"] == ["concepts/note-b.md"]
