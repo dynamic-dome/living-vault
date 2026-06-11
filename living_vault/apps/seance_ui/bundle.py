@@ -24,18 +24,22 @@ from living_vault.core.privacy import load_allowlist
 # ---------------------------------------------------------------------------
 
 _FORBIDDEN: list[tuple[re.Pattern, str]] = [
-    # CRITICAL 1 fix: tolerate 1-2 separators so json.dumps-doubled backslash is caught
-    (re.compile(r"[A-Za-z]:[\\/]{1,2}(?:Users|home)\b"), "machine-path (windows)"),
-    # Negative lookbehind (?<![A-Za-z]:) excludes "/Users" that is the slash-segment of
-    # a Windows path like "C:/Users" — the drive letter + colon occupy exactly the 2
-    # chars immediately before the "/" that starts the match.
+    # Captures the full path token so two distinct paths (e.g. C:\Users\domes\...
+    # and C:\Users\alice\...) produce different dedup keys and are not collapsed.
+    # Tolerates 1-2 separators so json.dumps-doubled backslash (C:\\Users) is caught
+    # by the raw-text sweep and the single-backslash parsed value deduplicates via
+    # _normalise_match (separator-run collapse).
+    (re.compile(r"[A-Za-z]:[\\/]{1,2}(?:Users|home)\b[^\s\"',)\]}]*"), "machine-path (windows)"),
+    # Negative lookbehind (?<![A-Za-z]:) excludes "/Users" that is the slash-segment
+    # of a Windows path like "C:/Users".  Captures the full posix path token so
+    # /Users/domes/... and /Users/alice/... have distinct dedup keys.
     # MINOR M2 fix: widen username char class to [\w.] to catch /home/.config/ and
     # /home/4user/ (dot and digit prefixes).
-    (re.compile(r"(?<![A-Za-z]:)/(?:Users|home)/[\w.]"), "machine-path (posix)"),
+    (re.compile(r"(?<![A-Za-z]:)/(?:Users|home)/[\w.][^\s\"',)\]}]*"), "machine-path (posix)"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{8,}"), "secret-like key"),
     (re.compile(r"\bANTHROPIC_API_KEY\b"), "secret env name"),
-    # MINOR M3: tilde home paths (Unix ~/... or Windows ~\...)
-    (re.compile(r"~[\\/]"), "machine-path (home tilde)"),
+    # MINOR M3: tilde home paths (Unix ~/... or Windows ~\...) — full token captured.
+    (re.compile(r"~[\\/][^\s\"',)\]}]*"), "machine-path (home tilde)"),
 ]
 
 

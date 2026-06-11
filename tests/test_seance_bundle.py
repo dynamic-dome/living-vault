@@ -390,3 +390,29 @@ def test_validator_clean_content_no_tilde_false_positive():
     """MINOR M3 regression: clean content without ~/ must not be flagged."""
     ok = json.dumps({"a": "Approximately ~10 items, cost ~5 EUR"})
     assert validate_bundle_text(ok) == []
+
+
+# ---- BUG FIX: dedup key must use full path span, not prefix fragment ----
+
+def test_validator_two_distinct_windows_paths_produce_two_findings():
+    """Dedup bug: two DISTINCT Windows paths must each produce their own finding.
+
+    Before the fix the dedup key was (label, m.group()) where the windows-path
+    pattern only matched the C:\\Users prefix — so C:\\Users\\domes\\geheim.md
+    and C:\\Users\\alice\\note.md both produced the same key and the second
+    finding was silently dropped.  After the fix the pattern captures the full
+    path token, so the keys are distinct and both findings are present.
+    """
+    payload = {
+        "a": "C:\\Users\\domes\\geheim.md",
+        "b": "C:\\Users\\alice\\note.md",
+    }
+    text = json.dumps(payload)
+    findings = validate_bundle_text(text)
+    windows_findings = [f for f in findings if "machine-path (windows)" in f]
+    assert len(windows_findings) == 2, (
+        f"Expected 2 distinct windows-path findings, got {len(windows_findings)}: {findings}"
+    )
+    all_text = " ".join(windows_findings)
+    assert "domes" in all_text, "domes path finding missing"
+    assert "alice" in all_text, "alice path finding missing"
