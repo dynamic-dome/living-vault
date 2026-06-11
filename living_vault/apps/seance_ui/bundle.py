@@ -1,7 +1,10 @@
 """Build the seance website bundle: persona cards + demo conversations.
 
 Fail-closed: every persona MUST be on the allowlist; neighbors are
-stripped to allowlist members; the export aborts on validator findings.
+stripped to allowlist members. NOTE: body_excerpt may still contain
+[[wikilinks]] to non-allowlisted pages — the bundle validator
+(validate_bundle_text, Task A3) MUST check wikilink targets against
+the allowlist before any deploy.
 """
 from __future__ import annotations
 
@@ -55,6 +58,10 @@ def build_seance_bundle(
     off_list = [p for p in persona_paths if p not in allowed]
     if off_list:
         raise SeanceExportError(f"personas not on allowlist (fail-closed): {off_list}")
+    seen: set[str] = set()
+    duplicates = [p for p in persona_paths if p in seen or seen.add(p)]  # type: ignore[func-returns-value]
+    if duplicates:
+        raise SeanceExportError(f"duplicate persona_paths (would collide card ids): {duplicates}")
     cards = [_build_card(vault_root, db_path, p, allowed) for p in persona_paths]
     demo = _load_demo(demo_path) if demo_path is not None else []
     return {
@@ -65,7 +72,10 @@ def build_seance_bundle(
 
 
 def _load_demo(demo_path: Path) -> list:
-    raw = json.loads(demo_path.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(demo_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise SeanceExportError(f"cannot load demo file {demo_path}: {e}") from e
     if not isinstance(raw, list):
         raise SeanceExportError("demo file must be a JSON list of conversations")
     for conv in raw:
