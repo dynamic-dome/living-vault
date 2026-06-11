@@ -233,3 +233,160 @@ def test_validator_flags_posix_home_path():
     bad = json.dumps({"path": "/home/dominic/projects/secret"})
     findings = validate_bundle_text(bad)
     assert any("machine-path" in f for f in findings)
+
+
+# ---------------------------------------------------------------------------
+# NEW TESTS — code-review findings (written FIRST, expected to fail before fix)
+# ---------------------------------------------------------------------------
+
+# ---- CRITICAL 1: backslash Windows paths bypass ----
+
+def test_validator_flags_backslash_windows_path_via_json_dumps():
+    """CRITICAL 1a: json.dumps doubles the backslash → raw text has C:\\\\Users\\\\...
+    The pattern must tolerate 1-2 separators and the parsed-value sweep must
+    also catch the original single-backslash value."""
+    payload = {"a": "C:\\Users\\domes\\geheim.md"}
+    # json.dumps produces: {"a": "C:\\Users\\domes\\geheim.md"}
+    # raw text contains C:\\Users (double backslash)
+    text = json.dumps(payload)
+    findings = validate_bundle_text(text)
+    assert len(findings) >= 1
+    assert any("machine-path" in f for f in findings)
+
+
+def test_validator_flags_unicode_escaped_windows_path():
+    """CRITICAL 1b: /  in raw JSON text (unicode-escaped slash)
+    must be caught by the parsed-value sweep."""
+    # Build the raw JSON string manually so it contains the literal escape
+    # C:/Users/domes  where / is written as \/
+    raw_json = '{"a": "C:\\/Users\\/domes\\/geheim.md"}'
+    findings = validate_bundle_text(raw_json)
+    assert len(findings) >= 1
+    assert any("machine-path" in f for f in findings)
+
+
+def test_validator_no_duplicate_findings_for_backslash_path():
+    """CRITICAL 1c: raw sweep + parsed sweep must NOT produce duplicate findings
+    for the exact same path (same label + same snippet after dedup)."""
+    payload = {"a": "C:\\Users\\domes\\geheim.md"}
+    text = json.dumps(payload)
+    findings = validate_bundle_text(text)
+    # Count how many machine-path (windows) findings exist
+    windows_findings = [f for f in findings if "machine-path (windows)" in f]
+    assert len(windows_findings) == 1, (
+        f"Expected exactly 1 windows-path finding, got {len(windows_findings)}: {findings}"
+    )
+
+
+# ---- IMPORTANT 2: invalid JSON fail-closed ----
+
+def test_validator_invalid_json_with_allowed_returns_finding():
+    """IMPORTANT 2: invalid JSON with allowed set must return exactly one finding
+    containing 'invalid bundle JSON', not silently skip the wikilink check."""
+    findings = validate_bundle_text("{not json", allowed={"a.md"})
+    assert len(findings) == 1
+    assert "invalid bundle JSON" in findings[0]
+
+
+def test_validator_invalid_json_without_allowed_still_clean():
+    """IMPORTANT 2b: invalid JSON WITHOUT allowed → no crash, no wikilink finding
+    (pattern check may still fire, but no JSON-error finding expected when
+    allowed is None since the wikilink check is skipped entirely)."""
+    findings = validate_bundle_text("{not json", allowed=None)
+    assert all("invalid bundle JSON" not in f for f in findings)
+
+
+# ---- IMPORTANT 3: non-wiki/ wikilinks ----
+
+def test_validator_flags_shorthand_wikilink_as_unresolvable():
+    """IMPORTANT 3a: [[concepts/secret]] has no wiki/ prefix → resolve_target
+    returns None → must be flagged as unresolvable wikilink."""
+    bundle_text = json.dumps({"body": "See [[concepts/secret]] here."})
+    allowed = {"concepts/note-a.md"}
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert any("unresolvable wikilink" in f for f in findings)
+    assert any("concepts/secret" in f for f in findings)
+
+
+def test_validator_flags_bare_page_name_wikilink_as_unresolvable():
+    """IMPORTANT 3b: [[Geheime Notiz]] (bare page name) → unresolvable."""
+    bundle_text = json.dumps({"body": "Refer to [[Geheime Notiz]] somehow."})
+    allowed = {"concepts/note-a.md"}
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert any("unresolvable wikilink" in f for f in findings)
+    assert any("Geheime Notiz" in f for f in findings)
+
+
+def test_validator_flags_traversal_wikilink():
+    """IMPORTANT 3c: [[../escape]] path traversal → unresolvable."""
+    bundle_text = json.dumps({"body": "Evil [[../escape]] link."})
+    allowed = {"concepts/note-a.md"}
+    findings = validate_bundle_text(bundle_text, allowed=allowed)
+    assert any("unresolvable wikilink" in f or "wikilink" in f for f in findings)
+
+
+def test_validator_no_unresolvable_findings_when_allowed_is_none():
+    """IMPORTANT 3d: unresolvable wikilink check only fires when allowed is not None."""
+    bundle_text = json.dumps({"body": "See [[concepts/secret]] here."})
+    findings = validate_bundle_text(bundle_text, allowed=None)
+    assert all("unresolvable wikilink" not in f for f in findings)
+
+
+# ---- MINOR M1: secret snippet truncation ----
+
+def test_validator_secret_finding_does_not_leak_full_value():
+    """MINOR M1: the snippet in a secret-like-key finding must be truncated —
+    it must NOT contain the full secret past the first 12 chars of the match."""
+    bad = json.dumps({"k": "sk-ant-api03-SUPERSECRET1234567890"})
+    findings = validate_bundle_text(bad)
+    secret_findings = [f for f in findings if "secret-like key" in f]
+    assert len(secret_findings) >= 1
+    # The full secret tail must not appear verbatim in any finding
+    assert all("SUPERSECRET1234567890" not in f for f in secret_findings)
+
+
+# ---- MINOR M2: posix pattern username widening ----
+
+def test_validator_flags_posix_home_config_path():
+    """MINOR M2: /home/.config/ — username starts with dot → must be flagged."""
+    bad = json.dumps({"p": "/home/.config/secret"})
+    findings = validate_bundle_text(bad)
+    assert any("machine-path" in f for f in findings)
+
+
+def test_validator_flags_posix_home_numeric_user():
+    """MINOR M2: /home/4user/ — username starts with digit → must be flagged."""
+    bad = json.dumps({"p": "/home/4user/projects"})
+    findings = validate_bundle_text(bad)
+    assert any("machine-path" in f for f in findings)
+
+
+def test_validator_clean_content_still_passes_after_m2():
+    """MINOR M2 regression: clean content (no home paths) must still return []."""
+    ok = json.dumps({
+        "a": "MCP-Server bauen: Transport via stdio, JSON-RPC 2.0.",
+        "b": "Zeitplan 10:30 Uhr, Verhältnis 1:5",
+    })
+    assert validate_bundle_text(ok) == []
+
+
+# ---- MINOR M3: tilde home paths ----
+
+def test_validator_flags_tilde_home_path():
+    """MINOR M3: ~/projects/secret must be flagged as machine-path (home tilde)."""
+    bad = json.dumps({"p": "~/projects/secret"})
+    findings = validate_bundle_text(bad)
+    assert any("home tilde" in f for f in findings)
+
+
+def test_validator_tilde_backslash_home_path():
+    """MINOR M3: ~\\ path (Windows tilde) must also be flagged."""
+    bad = json.dumps({"p": "~\\projects\\secret"})
+    findings = validate_bundle_text(bad)
+    assert any("home tilde" in f for f in findings)
+
+
+def test_validator_clean_content_no_tilde_false_positive():
+    """MINOR M3 regression: clean content without ~/ must not be flagged."""
+    ok = json.dumps({"a": "Approximately ~10 items, cost ~5 EUR"})
+    assert validate_bundle_text(ok) == []
