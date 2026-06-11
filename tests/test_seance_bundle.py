@@ -486,3 +486,92 @@ def test_cli_entrypoint_smoke_subprocess():
     )
     assert r.returncode == 0
     assert "allowlist" in r.stdout
+
+
+# ---------------------------------------------------------------------------
+# CLI review fixes (Fix 1, Fix 2, Fix 3)
+# ---------------------------------------------------------------------------
+
+# ---- Fix 1: stale bundle removed on failing re-run ----
+
+def test_cli_stale_bundle_removed_and_mentioned_on_failure(indexed, tmp_path):
+    """Fix 1: pre-existing out file is removed on a failing export, and
+    the error output mentions its removal."""
+    vault, db = indexed
+    # Plant a machine path so the validator fires
+    page = vault / "concepts" / "note-a.md"
+    original = page.read_text(encoding="utf-8")
+    page.write_text(original + "\n\nLokal: C:/Users/domes/stale.md\n", encoding="utf-8")
+    index_vault(vault, db)
+
+    allow = _write_allowlist(
+        tmp_path,
+        ["concepts/note-a.md", "concepts/note-b.md", "synthesis/syn-1.md"],
+    )
+    out = tmp_path / "stale-bundle.json"
+    # Pre-create the out file with sentinel content (simulates a previous run)
+    out.write_text('{"stale": true}', encoding="utf-8")
+
+    r = CliRunner().invoke(cli, [
+        "export-seance-bundle",
+        "--vault", str(vault), "--db", str(db),
+        "--allowlist", str(allow),
+        "--persona", "concepts/note-a.md",
+        "--out", str(out),
+    ])
+    assert r.exit_code != 0
+    assert not out.exists(), "stale bundle must be removed on failure"
+    assert "removed" in r.output.lower(), (
+        f"output must mention removal; got: {r.output!r}"
+    )
+
+
+def test_cli_no_removal_mention_when_no_prior_out(indexed, tmp_path):
+    """Fix 1: when no prior out file exists, error output must NOT claim removal."""
+    vault, db = indexed
+    page = vault / "concepts" / "note-a.md"
+    original = page.read_text(encoding="utf-8")
+    page.write_text(original + "\n\nLokal: C:/Users/domes/fail.md\n", encoding="utf-8")
+    index_vault(vault, db)
+
+    allow = _write_allowlist(
+        tmp_path,
+        ["concepts/note-a.md", "concepts/note-b.md", "synthesis/syn-1.md"],
+    )
+    out = tmp_path / "no-prior.json"
+    # Do NOT pre-create the file
+
+    r = CliRunner().invoke(cli, [
+        "export-seance-bundle",
+        "--vault", str(vault), "--db", str(db),
+        "--allowlist", str(allow),
+        "--persona", "concepts/note-a.md",
+        "--out", str(out),
+    ])
+    assert r.exit_code != 0
+    assert "stale bundle" not in r.output.lower(), (
+        f"must not claim removal when file did not exist; got: {r.output!r}"
+    )
+
+
+# ---- Fix 2: atomic write + writable-out error UX ----
+
+def test_cli_export_nonexistent_subdir_gives_cannot_write(indexed, tmp_path):
+    """Fix 2: --out into a non-existent subdirectory → exit != 0, 'cannot write' in output."""
+    vault, db = indexed
+    allow = _write_allowlist(
+        tmp_path,
+        ["concepts/note-a.md", "concepts/note-b.md", "synthesis/syn-1.md"],
+    )
+    out = tmp_path / "nonexistent" / "subdir" / "bundle.json"
+    r = CliRunner().invoke(cli, [
+        "export-seance-bundle",
+        "--vault", str(vault), "--db", str(db),
+        "--allowlist", str(allow),
+        "--persona", "concepts/note-a.md",
+        "--out", str(out),
+    ])
+    assert r.exit_code != 0
+    assert "cannot write" in r.output.lower(), (
+        f"expected 'cannot write' in output; got: {r.output!r}"
+    )

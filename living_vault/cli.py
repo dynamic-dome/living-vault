@@ -7,11 +7,17 @@ from pathlib import Path
 
 import click
 
+from living_vault.apps.seance_ui.bundle import (
+    SeanceExportError,
+    build_seance_bundle,
+    validate_bundle_text,
+)
 from living_vault.core import db as db_mod
 from living_vault.core import history as history_mod
-from living_vault.core.indexer import index_vault
 from living_vault.core.embeddings import index_embeddings
+from living_vault.core.indexer import index_vault
 from living_vault.core.llm import get_llm
+from living_vault.core.privacy import load_allowlist
 from living_vault.core.reader import read_page
 from living_vault.core.voice.distill import distill_voice_via_llm
 
@@ -275,35 +281,49 @@ def extract_voice_cmd(vault: str, db: str, limit: int | None, force: bool, yes: 
 @click.option("--db", "db_path", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.option("--allowlist", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.option("--persona", "personas", multiple=True, required=True,
-              help="Relpath einer Persona-Page; 1-3x angeben. Muss auf der Allowlist stehen.")
+              help="Relative path of a persona page; pass 1-3 times. Must be on the allowlist.")
 @click.option("--demo", type=click.Path(exists=True, dir_okay=False), default=None,
-              help="JSON-Datei mit vorgenerierten Demo-Konversationen.")
+              help="JSON file with pre-generated demo conversations.")
 @click.option("--out", required=True, type=click.Path())
-def export_seance_bundle_cmd(vault, db_path, allowlist, personas, demo, out):
-    """Exportiert das public-safe Séance-Bundle für die Website."""
-    import json as _json
-    from pathlib import Path as _P
-
-    from living_vault.apps.seance_ui.bundle import (
-        SeanceExportError, build_seance_bundle, validate_bundle_text,
-    )
-    from living_vault.core.privacy import load_allowlist as _load_allowlist
-
+def export_seance_bundle_cmd(
+    vault: str,
+    db_path: str,
+    allowlist: str,
+    personas: tuple[str, ...],
+    demo: str | None,
+    out: str,
+) -> None:
+    """Export the public-safe Séance bundle for the website."""
+    out_p = Path(out)
     try:
         bundle = build_seance_bundle(
-            vault_root=_P(vault), db_path=_P(db_path),
-            allowlist_path=_P(allowlist), persona_paths=list(personas),
-            demo_path=_P(demo) if demo else None,
+            vault_root=Path(vault),
+            db_path=Path(db_path),
+            allowlist_path=Path(allowlist),
+            persona_paths=list(personas),
+            demo_path=Path(demo) if demo else None,
         )
-        text = _json.dumps(bundle, ensure_ascii=False, indent=2)
-        findings = validate_bundle_text(text, allowed=set(_load_allowlist(_P(allowlist))))
+        text = json.dumps(bundle, ensure_ascii=False, indent=2)
+        findings = validate_bundle_text(text, allowed=set(load_allowlist(Path(allowlist))))
         if findings:
             raise SeanceExportError(
                 "validator findings (export aborted):\n" + "\n".join(findings)
             )
     except SeanceExportError as exc:
-        raise click.ClickException(str(exc))
-    _P(out).write_text(text, encoding="utf-8")
+        stale_removed = out_p.exists()
+        out_p.unlink(missing_ok=True)
+        suffix = f"; stale bundle at {out} removed" if stale_removed else ""
+        raise click.ClickException(str(exc) + suffix)
+
+    tmp_p = out_p.with_suffix(out_p.suffix + ".tmp")
+    try:
+        tmp_p.write_text(text, encoding="utf-8")
+        import os
+        os.replace(tmp_p, out_p)
+    except OSError as e:
+        tmp_p.unlink(missing_ok=True)
+        raise click.ClickException(f"cannot write {out}: {e}")
+
     click.echo(
         f"wrote {out} ({len(bundle['personas'])} personas, "
         f"{len(bundle['demo_conversations'])} demo conversations)"
