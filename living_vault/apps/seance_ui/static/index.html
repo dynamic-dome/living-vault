@@ -2,99 +2,221 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>séance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    html,body{margin:0;height:100%;background:#0a0a0f;color:#cfe;font-family:'JetBrains Mono',monospace;overflow:hidden;}
-    #wrap{display:grid;grid-template-columns:320px 1fr;height:100vh;min-height:0;}
-    #side{border-right:1px solid #234;display:flex;flex-direction:column;min-height:0;min-width:0;}
-    #tabs{display:flex;border-bottom:1px solid #234;}
-    .tab{flex:1;padding:8px;text-align:center;cursor:pointer;font-size:12px;background:#13202c;border-right:1px solid #234;}
+    :root{
+      --void:#0b0809;      /* warm near-black séance room */
+      --ash:#15100e;       /* raised panel */
+      --ash-2:#1f1814;     /* hover / selected */
+      --gild:#c9a24b;      /* antique gold — frames, labels */
+      --candle:#e9b067;    /* candlelight — the medium, warm accent */
+      --candle-soft:#caa06a;
+      --ecto:#8fe0c8;      /* ectoplasm — spirits only */
+      --oxblood:#b2404a;   /* sealing-wax / danger */
+      --bone:#e8dccb;      /* parchment text */
+      --mist:#9c9088;      /* muted meta */
+      --rule:#3a2c1f;      /* warm hairline */
+      --serif:'EB Garamond', Georgia, serif;
+      --ritual:'Cinzel', serif;
+      --mono:'JetBrains Mono', ui-monospace, Consolas, monospace;
+    }
+    *{box-sizing:border-box;}
+    html,body{margin:0;height:100%;background:var(--void);color:var(--bone);
+      font-family:var(--serif);overflow:hidden;}
+
+    /* ── ambient candlelight: warm flicker vignette behind everything ── */
+    #veil{position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:
+        radial-gradient(100% 70% at 50% -8%, rgba(233,176,103,.12), transparent 50%),
+        radial-gradient(80% 60% at 88% 12%, rgba(143,224,200,.05), transparent 55%),
+        radial-gradient(150% 130% at 50% 120%, rgba(11,8,9,.6), var(--void) 72%);
+      animation:flicker 7.5s ease-in-out infinite;}
+    @keyframes flicker{0%,100%{opacity:1}40%{opacity:.92}62%{opacity:.97}82%{opacity:.9}}
+
+    /* ── the rift: brief ecto bloom on summon ── */
+    #rift{position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;
+      background:radial-gradient(58% 48% at 50% 50%, rgba(143,224,200,.20), transparent 62%);}
+    #rift.active{animation:rift 950ms ease-out;}
+    @keyframes rift{0%{opacity:0;transform:scale(.96)}22%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+
+    #wrap{position:relative;z-index:1;display:grid;grid-template-columns:300px 1fr;height:100vh;min-height:0;}
+
+    /* ── left: the register of spirits ── */
+    #side{border-right:1px solid var(--rule);display:flex;flex-direction:column;min-height:0;min-width:0;
+      background:linear-gradient(180deg, rgba(21,16,14,.6), rgba(11,8,9,.2));}
+    #brandmark{padding:16px 16px 10px;border-bottom:1px solid var(--rule);}
+    #brandmark .mark{font-family:var(--ritual);font-weight:600;font-size:19px;letter-spacing:.34em;
+      color:var(--candle);text-transform:lowercase;text-shadow:0 0 18px rgba(233,176,103,.35);}
+    #brandmark .sub{font-family:var(--mono);font-size:10px;color:var(--mist);letter-spacing:.12em;margin-top:5px;}
+
+    #tabs{display:flex;border-bottom:1px solid var(--rule);}
+    .tab{flex:1;padding:9px 6px;text-align:center;cursor:pointer;
+      font-family:var(--ritual);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+      color:var(--mist);background:transparent;border-right:1px solid var(--rule);transition:color .2s, background .2s;}
     .tab:last-child{border-right:none;}
-    .tab.active{background:#1a2e1c;color:#cfe;font-weight:bold;}
-    #list{flex:1;overflow:auto;padding:8px;font-size:12px;}
-    .pageItem{padding:6px 8px;cursor:pointer;border-radius:3px;}
-    .pageItem:hover{background:#1a1f2e;}
-    .sessionItem{padding:8px 10px;cursor:pointer;border-radius:3px;border:1px solid #234;margin-bottom:6px;background:#0f1620;}
-    .sessionItem:hover{background:#1a2532;}
-    .sessionMeta{font-size:10px;opacity:.65;margin-top:2px;}
-    #chat{display:flex;flex-direction:column;padding:12px;min-height:0;min-width:0;}
-    #header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-    #who{opacity:.85;font-size:12px;}
-    #exportBtn{background:#235;color:#cfe;border:1px solid #347;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
-    #exportBtn:disabled{opacity:.4;cursor:not-allowed;}
-    #log{flex:1;overflow:auto;font-size:13px;line-height:1.5;}
-    .msg{margin:8px 0;padding:8px 10px;border-radius:6px;}
-    .msg.user{background:#13202c;}
-    .msg.assistant{background:#1a2e1c;}
-    .toolEvent{
-      margin:6px 0 4px 12px;
-      padding:4px 10px;
-      border-left:2px solid #4a8;
-      font-size:11px;
-      font-style:italic;
-      color:#9bd;
-      opacity:.85;
-    }
-    .toolEvent.error{
-      border-left-color:#c66;
-      color:#daa;
-    }
-    .toolEvent .wikilink{
-      color:#cfe;
-      font-weight:bold;
-    }
-    .toolEvent.budgetWarning{
-      border-left-color:#e80;
-      color:#fc8;
-    }
-    /* Phase-10b: multi-select page picker + mode dropdown */
-    .pageItem.selected{background:#234;border-left:3px solid #4a8;}
-    #modeRow{padding:8px;border-top:1px solid #234;display:none;}
-    #modeRow.visible{display:flex;gap:8px;align-items:center;font-size:11px;}
-    #modeRow select{background:#13202c;color:#cfe;border:1px solid #234;padding:4px;font-family:inherit;font-size:11px;}
-    #summonBtn{background:#1a3a1c;color:#cfe;border:1px solid #4a8;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px;}
+    .tab:hover{color:var(--bone);}
+    .tab.active{color:var(--candle);background:rgba(233,176,103,.06);
+      box-shadow:inset 0 -2px 0 var(--candle);}
+
+    #list{flex:1;overflow:auto;padding:8px 8px 4px;font-family:var(--mono);font-size:12px;}
+    .listHint{opacity:.55;font-size:11px;padding:8px;font-style:italic;font-family:var(--serif);}
+    .pageItem{padding:6px 9px;cursor:pointer;border-radius:3px;color:var(--mist);
+      border-left:2px solid transparent;transition:background .15s, color .15s, border-color .15s;}
+    .pageItem:hover{background:var(--ash-2);color:var(--bone);}
+    .pageItem.selected{background:rgba(143,224,200,.08);color:var(--ecto);
+      border-left:2px solid var(--ecto);text-shadow:0 0 10px rgba(143,224,200,.4);}
+    .sessionItem{padding:9px 11px;cursor:pointer;border-radius:4px;border:1px solid var(--rule);
+      margin-bottom:7px;background:rgba(21,16,14,.5);transition:background .15s, border-color .15s;}
+    .sessionItem:hover{background:var(--ash-2);border-color:var(--gild);}
+    .sessionItem .sName{font-family:var(--mono);font-size:12px;color:var(--bone);}
+    .sessionMeta{font-family:var(--mono);font-size:10px;color:var(--mist);margin-top:3px;letter-spacing:.04em;}
+
+    /* mode row — assembling the circle */
+    #modeRow{padding:10px 12px;border-top:1px solid var(--rule);display:none;
+      background:rgba(143,224,200,.04);}
+    #modeRow.visible{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+      font-family:var(--mono);font-size:11px;color:var(--mist);}
+    #modeRow label{letter-spacing:.1em;text-transform:uppercase;font-size:10px;}
+    #modeRow select{background:var(--ash);color:var(--bone);border:1px solid var(--rule);
+      padding:5px 6px;font-family:var(--mono);font-size:11px;border-radius:3px;}
+    #summonBtn{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
+      padding:7px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:10px;
+      letter-spacing:.16em;text-transform:uppercase;transition:background .2s, box-shadow .2s;}
+    #summonBtn:hover:not(:disabled){background:rgba(143,224,200,.18);box-shadow:0 0 20px -4px rgba(143,224,200,.5);}
     #summonBtn:disabled{opacity:.4;cursor:not-allowed;}
-    /* Phase-10b: persona-labeled assistant bubbles */
-    .msg.persona{background:#1a2e1c;border-left:3px solid #4a8;padding-left:10px;}
-    .personaLabel{font-size:10px;font-weight:bold;opacity:.85;margin-bottom:4px;}
-    #form{display:flex;gap:8px;}
-    #txt{flex:1;background:#13202c;border:1px solid #234;color:#cfe;padding:8px;border-radius:4px;font-family:inherit;}
-    button{background:#235;color:#cfe;border:1px solid #347;padding:8px 14px;border-radius:4px;cursor:pointer;font-family:inherit;}
-    button:disabled{opacity:.4;cursor:not-allowed;}
-    #toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;background:#1a3a1c;border:1px solid #4a8;border-radius:6px;font-size:12px;display:none;z-index:50;max-width:60ch;}
+
+    /* ── right: the séance table ── */
+    #chat{display:flex;flex-direction:column;padding:16px 20px;min-height:0;min-width:0;}
+    #header{display:flex;justify-content:space-between;align-items:center;gap:1em;
+      margin-bottom:12px;padding-bottom:11px;border-bottom:1px solid var(--rule);}
+    #who{font-family:var(--mono);font-size:12px;color:var(--mist);letter-spacing:.03em;}
+    #who .liveDot{color:var(--ecto);}
+    #exportBtn{background:transparent;color:var(--gild);border:1px solid var(--gild);
+      padding:6px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:10px;
+      letter-spacing:.16em;text-transform:uppercase;transition:background .2s, color .2s;}
+    #exportBtn:hover:not(:disabled){background:var(--gild);color:var(--void);}
+    #exportBtn:disabled{opacity:.35;cursor:not-allowed;}
+
+    #log{flex:1;overflow:auto;font-size:17px;line-height:1.62;padding-right:6px;}
+
+    /* messages materialize out of the dark */
+    .msg{margin:14px 0;padding:11px 16px;border-radius:8px;max-width:74ch;width:fit-content;
+      animation:materialize .55s cubic-bezier(.2,.7,.25,1);}
+    @keyframes materialize{
+      from{opacity:0;transform:translateY(7px) scale(.99);filter:blur(4px);}
+      to{opacity:1;transform:none;filter:blur(0);}
+    }
+    /* the medium's question — warm candle, asked into the dark, right-leaning */
+    .msg.user{margin-left:auto;background:rgba(233,176,103,.07);
+      border:1px solid rgba(233,176,103,.28);color:var(--bone);
+      font-style:italic;}
+    /* the spirit answers — cold ectoplasmic glow */
+    .msg.assistant{background:rgba(143,224,200,.05);
+      border:1px solid rgba(143,224,200,.16);
+      box-shadow:0 0 30px -12px rgba(143,224,200,.4);color:var(--bone);}
+    .msg.persona{background:rgba(143,224,200,.05);border:1px solid rgba(143,224,200,.16);
+      border-left:3px solid var(--ecto);box-shadow:0 0 30px -12px rgba(143,224,200,.4);padding-left:15px;}
+    .personaLabel{font-family:var(--ritual);font-size:11px;font-weight:600;letter-spacing:.2em;
+      text-transform:uppercase;color:var(--ecto);margin-bottom:6px;text-shadow:0 0 12px rgba(143,224,200,.4);}
+
+    /* tool events — the apparatus, faint and technical */
+    .toolEvent{margin:7px 0 6px 14px;padding:4px 12px;border-left:2px solid rgba(143,224,200,.4);
+      font-family:var(--mono);font-size:11px;font-style:normal;color:var(--mist);opacity:.85;
+      animation:materialize .4s ease-out;}
+    .toolEvent.error{border-left-color:var(--oxblood);color:#d9999f;}
+    .toolEvent .wikilink{color:var(--ecto);font-weight:500;}
+    .toolEvent.budgetWarning{border-left-color:var(--candle);color:var(--candle-soft);}
+
+    /* the question form */
+    #form{display:flex;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule);}
+    #txt{flex:1;background:var(--ash);border:1px solid var(--rule);color:var(--bone);
+      padding:11px 13px;border-radius:5px;font-family:var(--mono);font-size:13px;transition:border-color .2s, box-shadow .2s;}
+    #txt::placeholder{color:var(--mist);opacity:.7;}
+    #txt:focus{outline:none;border-color:var(--candle);box-shadow:0 0 0 1px rgba(233,176,103,.25), 0 0 22px -8px rgba(233,176,103,.5);}
+    #send{background:var(--candle);color:var(--void);border:1px solid var(--candle);
+      padding:11px 20px;border-radius:5px;cursor:pointer;font-family:var(--ritual);font-size:11px;
+      letter-spacing:.16em;text-transform:uppercase;transition:box-shadow .2s, opacity .2s;}
+    #send:hover:not(:disabled){box-shadow:0 0 22px -4px rgba(233,176,103,.6);}
+    #send:disabled,#txt:disabled{opacity:.4;cursor:not-allowed;}
+
+    #toast{position:fixed;bottom:22px;right:22px;padding:11px 17px;background:var(--ash);
+      border:1px solid var(--gild);border-radius:6px;font-family:var(--mono);font-size:12px;
+      color:var(--bone);display:none;z-index:50;max-width:56ch;
+      box-shadow:0 0 30px -10px rgba(201,162,75,.4);}
+
+    /* focus visibility (quality floor) */
+    :focus-visible{outline:1px solid var(--candle);outline-offset:2px;}
+
+    /* scrollbars, warm and thin */
+    ::-webkit-scrollbar{width:9px;height:9px;}
+    ::-webkit-scrollbar-thumb{background:var(--rule);border-radius:5px;}
+    ::-webkit-scrollbar-thumb:hover{background:#4d3a28;}
+    ::-webkit-scrollbar-track{background:transparent;}
+
+    /* responsive: keep the desktop instrument usable on narrow screens */
+    @media (max-width:900px){#wrap{grid-template-columns:240px 1fr;}}
+    @media (max-width:640px){
+      #wrap{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
+      #side{border-right:none;border-bottom:1px solid var(--rule);}
+      #log{font-size:16px;}
+    }
+
+    /* respect reduced motion */
+    @media (prefers-reduced-motion:reduce){
+      #veil{animation:none;}
+      #rift.active{animation:none;}
+      .msg,.toolEvent{animation:none;}
+    }
   </style>
 </head>
 <body>
+<div id="veil"></div>
+<div id="rift"></div>
 <div id="wrap">
   <div id="side">
-    <div id="tabs">
-      <div class="tab active" data-tab="pages" onclick="switchTab('pages')">pages</div>
-      <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">past sessions</div>
+    <div id="brandmark">
+      <div class="mark">✦ séance</div>
+      <div class="sub">commune with the pages of the vault</div>
     </div>
-    <div id="list"><div style="opacity:.6;font-size:11px;">loading…</div></div>
+    <div id="tabs">
+      <div class="tab active" data-tab="pages" onclick="switchTab('pages')">spirits</div>
+      <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">records</div>
+    </div>
+    <div id="list"><div class="listHint">the register stirs…</div></div>
     <div id="modeRow">
-      <label>mode:</label>
+      <label>circle:</label>
       <select id="modeSelect">
         <option value="roundrobin">round-robin</option>
         <option value="moderator">moderator (@-mention)</option>
         <option value="freeforall">free-for-all</option>
       </select>
-      <button id="summonBtn" onclick="summonRoundtable()">summon roundtable</button>
+      <button id="summonBtn" onclick="summonRoundtable()">summon the circle</button>
     </div>
   </div>
   <div id="chat">
     <div id="header">
-      <div id="who">no page summoned yet</div>
-      <button id="exportBtn" disabled onclick="exportSession()">export to wiki</button>
+      <div id="who">the circle is empty — choose a spirit</div>
+      <button id="exportBtn" disabled onclick="exportSession()">seal record</button>
     </div>
     <div id="log"></div>
-    <form id="form"><input id="txt" autocomplete="off" placeholder="speak to the page…" disabled /><button id="send" disabled>say</button></form>
+    <form id="form"><input id="txt" autocomplete="off" placeholder="speak into the dark…" disabled /><button id="send" disabled>ask</button></form>
   </div>
 </div>
 <div id="toast"></div>
 <script>
 let sid = null;
 let currentTab = "pages";
+
+function ritualFlash(){
+  const r = document.getElementById("rift");
+  r.classList.remove("active");
+  void r.offsetWidth;  // restart the animation even on rapid re-summon
+  r.classList.add("active");
+}
 
 function switchTab(name) {
   currentTab = name;
@@ -131,7 +253,7 @@ function togglePageSelection(path, el){
     selectedPaths.delete(path);
     el.classList.remove("selected");
   } else if (selectedPaths.size >= 8){
-    toast("max 8 personas per roundtable");
+    toast("the circle holds at most 8 spirits");
     return;
   } else {
     selectedPaths.add(path);
@@ -156,7 +278,7 @@ function singleSummonOnDoubleClick(path){
 }
 
 async function summonRoundtable(){
-  if (selectedPaths.size < 2){ toast("pick at least 2 pages"); return; }
+  if (selectedPaths.size < 2){ toast("summon at least 2 spirits for a circle"); return; }
   const mode = document.getElementById("modeSelect").value;
   const paths = [...selectedPaths];
 
@@ -180,10 +302,11 @@ async function summonRoundtable(){
   } finally {
     btn.disabled = false;
   }
-  if (!r.ok){ toast("summon failed: " + r.status); return; }
+  if (!r.ok){ toast("the circle would not form: " + r.status); return; }
   const j = await r.json();
   sid = j.session_id;
-  document.getElementById("who").textContent = `${mode} session with ${paths.length} personas`;
+  ritualFlash();
+  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> the circle — ${paths.length} spirits · ${mode}`;
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
@@ -198,13 +321,13 @@ async function loadSessions(){
   const r = await fetch("/api/sessions"); const j = await r.json();
   const el = document.getElementById("list"); el.innerHTML = "";
   if (j.length === 0) {
-    el.innerHTML = '<div style="opacity:.5;padding:8px;font-size:11px;">no sessions yet — pick a page and start talking</div>';
+    el.innerHTML = '<div class="listHint">no séances recorded — summon a spirit to begin</div>';
     return;
   }
   j.forEach(s => {
     const d = document.createElement("div"); d.className="sessionItem";
     const date = (s.started_at || "").substring(0, 16).replace("T", " ");
-    d.innerHTML = `<div>${s.page_path}</div><div class="sessionMeta">${date} | ${s.message_count} msgs</div>`;
+    d.innerHTML = `<div class="sName">${s.page_path}</div><div class="sessionMeta">${date} · ${s.message_count} msgs</div>`;
     d.onclick = () => loadSessionIntoChat(s.id, s.page_path);
     el.appendChild(d);
   });
@@ -212,10 +335,11 @@ async function loadSessions(){
 
 async function loadSessionIntoChat(sessionId, pagePath){
   const r = await fetch(`/api/sessions/${sessionId}`);
-  if (!r.ok) { toast("could not load session"); return; }
+  if (!r.ok) { toast("the record would not open"); return; }
   const j = await r.json();
   sid = sessionId;
-  document.getElementById("who").textContent = "viewing past session: " + pagePath;
+  ritualFlash();
+  document.getElementById("who").textContent = "record · " + pagePath;
   document.getElementById("log").innerHTML = "";
   j.messages.forEach(m => {
     if (m.role === "tool_use"){
@@ -255,9 +379,11 @@ function hashColorJs(path){
 
 async function summon(path){
   const r = await fetch("/api/summon",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path})});
-  if(!r.ok){ toast("summon failed: " + path); return; }
+  if(!r.ok){ toast("the spirit would not answer: " + path); return; }
   const j = await r.json(); sid = j.session_id;
-  document.getElementById("who").textContent = "speaking with: "+path+" — era "+(j.persona.era_marker||"unknown");
+  ritualFlash();
+  const name = path.split("/").pop().replace(/\.md$/, "");
+  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> communing with <b>${escapeHtml(name)}</b> · era ${escapeHtml(j.persona.era_marker||"unknown")}`;
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
@@ -268,14 +394,14 @@ async function summon(path){
 async function exportSession(){
   if (sid === null) return;
   const btn = document.getElementById("exportBtn");
-  btn.disabled = true; btn.textContent = "exporting…";
+  btn.disabled = true; btn.textContent = "sealing…";
   try {
     const r = await fetch(`/api/sessions/${sid}/export`, {method: "POST"});
-    if (!r.ok) { toast("export failed"); return; }
+    if (!r.ok) { toast("the seal would not hold"); return; }
     const j = await r.json();
-    toast("exported to: " + j.exported_to);
+    toast("sealed into: " + j.exported_to);
   } finally {
-    btn.disabled = false; btn.textContent = "export to wiki";
+    btn.disabled = false; btn.textContent = "seal record";
   }
 }
 
@@ -316,10 +442,11 @@ function appendPersonaBubble(rep){
   const log = document.getElementById("log");
   const d = document.createElement("div");
   d.className = "msg persona";
-  d.style.borderLeftColor = rep.color || "#4a8";
+  d.style.borderLeftColor = rep.color || "#8fe0c8";
   const labelEl = document.createElement("div");
   labelEl.className = "personaLabel";
   labelEl.textContent = (rep.persona_path || "").split("/").pop().replace(/\.md$/, "");
+  labelEl.style.color = rep.color || "#8fe0c8";
   const textEl = document.createElement("div");
   textEl.textContent = rep.text || "";
   d.appendChild(labelEl);
@@ -339,7 +466,7 @@ function appendToolEvent(ev, idx, total){
   } else {
     const path = (ev.tool_args && ev.tool_args.neighbor_path) || "?";
     const chars = summary.chars || 0;
-    d.innerHTML = `» consulted <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} chars)`;
+    d.innerHTML = `» the medium consults <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} chars)`;
     // Budget warning fires for events 7..10 ONLY when the entire turn produced
     // at most 10 events. If the soft-cap-rejection event (the 11th) made it
     // into the batch, total is 11 and the warning is suppressed for the whole
@@ -347,7 +474,7 @@ function appendToolEvent(ev, idx, total){
     // tells the story without doubling the visual noise on each preceding event.
     if (idx + 1 >= 7 && total <= 10){
       d.classList.add("budgetWarning");
-      d.innerHTML += ` <span style="opacity:.7">— nearing budget (${idx + 1}/10)</span>`;
+      d.innerHTML += ` <span style="opacity:.7">— the veil thins (${idx + 1}/10)</span>`;
     }
   }
   log.appendChild(d);

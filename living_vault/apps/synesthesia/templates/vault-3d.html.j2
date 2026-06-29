@@ -4,22 +4,33 @@
   <meta charset="utf-8" />
   <title>{{ title }}</title>
   <style>
-    html, body { margin:0; height:100%; background:#0a0a0f; color:#cfe; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace; overflow:hidden; }
-    #info { position:fixed; top:8px; left:8px; padding:6px 10px; background:rgba(0,0,0,.5); border-radius:4px; font-size:12px; z-index:5; }
-    #picked { position:fixed; bottom:8px; left:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:12px; max-width:60ch; white-space:pre-wrap; z-index:5; }
+    html, body { margin:0; height:100%; background:#080a0e; color:#cfe; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace; overflow:hidden; }
+    /* cinematic vignette over the canvas */
+    #vignette { position:fixed; inset:0; pointer-events:none; z-index:3;
+      background: radial-gradient(120% 100% at 50% 50%, transparent 58%, rgba(4,5,8,.55) 100%); }
+    .hud { position:fixed; z-index:5; background:rgba(8,10,14,.62); border:1px solid rgba(120,150,190,.16);
+      border-radius:6px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+      box-shadow:0 6px 30px -16px rgba(0,0,0,.8); }
+    #info { top:10px; left:10px; padding:7px 12px; font-size:12px; color:#9fb6d6; letter-spacing:.02em; }
+    #info b { color:#cfe; }
+    #picked { bottom:10px; left:10px; padding:9px 13px; font-size:12px; max-width:62ch; white-space:pre-wrap;
+      line-height:1.5; color:#d6e6f5; min-height:0; transition:opacity .18s; }
+    #picked:empty { opacity:0; }
     {% if include_history %}
-    #history { position:fixed; bottom:8px; right:8px; padding:8px 12px; background:rgba(0,0,0,.6); border-radius:4px; font-size:11px; max-width:48ch; max-height:18em; overflow-y:auto; z-index:5; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace; }
-    #history h4 { margin: 0 0 4px 0; font-size:11px; color:#fa7; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; }
+    #history { position:fixed; bottom:10px; right:10px; padding:9px 13px; font-size:11px; max-width:48ch; max-height:18em; overflow-y:auto; z-index:5; font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
+      background:rgba(8,10,14,.62); border:1px solid rgba(120,150,190,.16); border-radius:6px;
+      backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:0 6px 30px -16px rgba(0,0,0,.8); }
+    #history h4 { margin: 0 0 5px 0; font-size:10px; color:#ffb86b; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; }
     #history ul { margin:0; padding:0; list-style:none; }
-    #history li { padding:2px 0; border-bottom:1px dotted #345; color:#9ab; }
+    #history li { padding:3px 0; border-bottom:1px dotted rgba(80,110,140,.4); color:#9ab; }
     #history li:last-child { border-bottom:none; }
     #history li .h-date { color:#7ad; }
-    #history li .h-sha { color:#fa7; margin: 0 6px; }
+    #history li .h-sha { color:#ffb86b; margin: 0 6px; }
     #history .h-empty { color:#567; font-style:italic; }
     {% endif %}
     {% if embed_url %}
-    #brand { position:fixed; top:0; left:0; right:0; padding:10px 14px; background:linear-gradient(180deg, rgba(10,10,15,0.92), rgba(10,10,15,0)); display:flex; justify-content:space-between; align-items:baseline; gap:1em; font-size:13px; z-index:4; pointer-events:none; }
-    #brand .b-host { color:#fa7; letter-spacing:0.04em; font-weight:600; }
+    #brand { position:fixed; top:0; left:0; right:0; padding:11px 16px; background:linear-gradient(180deg, rgba(8,10,14,0.94), rgba(8,10,14,0)); display:flex; justify-content:space-between; align-items:baseline; gap:1em; font-size:13px; z-index:4; pointer-events:none; }
+    #brand .b-host { color:#ffb86b; letter-spacing:0.05em; font-weight:600; text-shadow:0 0 16px rgba(255,184,107,.3); }
     #brand .b-sub { color:#9ab; font-size:11px; }
     #footstamp { position:fixed; bottom:0; right:0; padding:6px 10px; font-size:10px; color:#567; opacity:.7; z-index:4; pointer-events:none; }
     {% endif %}
@@ -33,8 +44,9 @@
   </div>
   <div id="footstamp">Build {{ build_at }} · schema v{{ schema_version }}</div>
   {% endif %}
-  <div id="info">{{ count }} pages | {{ edge_count }} links | drag to orbit | scroll to zoom</div>
-  <div id="picked"></div>
+  <div id="vignette"></div>
+  <div id="info" class="hud">{{ count }} pages | {{ edge_count }} links | <b>drag</b> to orbit · <b>scroll</b> to zoom · <b>click</b> a node to focus</div>
+  <div id="picked" class="hud"></div>
   {% if include_history %}
   <div id="history"><h4>History (last 10 commits)</h4><div class="h-empty">hover a node to see git history</div></div>
   {% endif %}
@@ -49,21 +61,37 @@
   <script type="module">
     import * as THREE from "three";
     import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
     const NODES = {{ nodes_json | safe }};
     const EDGES = {{ edges_json | safe }};
 
+    const BG = 0x080a0e;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+    scene.background = new THREE.Color(BG);
+    // linear depth fog — distant nodes dissolve into the dark for real depth
+    scene.fog = new THREE.Fog(BG, 90, 640);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 6000);
     camera.position.set(70,70,70);
+
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     document.body.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement);
 
-    // light
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+
+    // soft fill light — the glow itself comes from emissive + bloom, not lamps
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    scene.add(new THREE.HemisphereLight(0x99bbff, 0x1a1014, 0.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.5);
     dir.position.set(50,80,50);
     scene.add(dir);
 
@@ -74,30 +102,68 @@
       return palette[h % palette.length];
     };
 
+    // one shared sphere, scaled per node (geometry reuse)
+    const sphereGeo = new THREE.SphereGeometry(1, 18, 14);
+
     const nodeMeshes = [];
     NODES.forEach((n) => {
-      const r = 0.8 + Math.log(1 + (n.degree || 0)) * 0.5;
-      const geom = new THREE.SphereGeometry(r, 16, 12);
-      const mat = new THREE.MeshStandardMaterial({ color: clusterColor(n.cluster) });
-      const mesh = new THREE.Mesh(geom, mat);
+      const r = 0.8 + Math.log(1 + (n.degree || 0)) * 0.55;
+      const col = new THREE.Color(clusterColor(n.cluster));
+      const mat = new THREE.MeshStandardMaterial({
+        color: col, emissive: col, emissiveIntensity: 0.68,
+        roughness: 0.45, metalness: 0.0, transparent: true, opacity: 1.0,
+      });
+      const mesh = new THREE.Mesh(sphereGeo, mat);
+      mesh.scale.setScalar(r);
       mesh.position.set(n.x, n.y, n.z);
       mesh.userData = n;
       scene.add(mesh);
       nodeMeshes.push(mesh);
     });
 
+    // adjacency + a single LineSegments for all edges (one draw call)
     const nodeIndex = Object.fromEntries(NODES.map((n,i) => [n.path, i]));
+    const adj = NODES.map(() => new Set());
+    const segPositions = [];
     EDGES.forEach((e) => {
-      const a = NODES[nodeIndex[e.from]];
-      const b = NODES[nodeIndex[e.to]];
-      if (!a || !b) return;
-      const geom = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(a.x, a.y, a.z),
-        new THREE.Vector3(b.x, b.y, b.z),
-      ]);
-      const mat = new THREE.LineBasicMaterial({ color: 0x335577, transparent:true, opacity:0.4 });
-      scene.add(new THREE.Line(geom, mat));
+      const ai = nodeIndex[e.from], bi = nodeIndex[e.to];
+      if (ai === undefined || bi === undefined) return;
+      const a = NODES[ai], b = NODES[bi];
+      segPositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      adj[ai].add(bi); adj[bi].add(ai);
     });
+    const edgeGeo = new THREE.BufferGeometry();
+    edgeGeo.setAttribute("position", new THREE.Float32BufferAttribute(segPositions, 3));
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x2c4258, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
+    scene.add(new THREE.LineSegments(edgeGeo, edgeMat));
+
+    // bright overlay for the hovered node's incident edges
+    const hlGeo = new THREE.BufferGeometry();
+    hlGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(0), 3));
+    const hlMat = new THREE.LineBasicMaterial({ color: 0x8fe0c8, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    scene.add(new THREE.LineSegments(hlGeo, hlMat));
+
+    // ambient dust on a far shell for parallax atmosphere
+    (function() {
+      const COUNT = 800, pos = new Float32Array(COUNT * 3);
+      for (let i = 0; i < COUNT; i++) {
+        const rad = 600 + (i * 137.5 % 1400);
+        const t = (i * 2.39996), p = Math.acos(1 - 2 * ((i + 0.5) / COUNT));
+        pos[i*3]   = rad * Math.sin(p) * Math.cos(t);
+        pos[i*3+1] = rad * Math.cos(p);
+        pos[i*3+2] = rad * Math.sin(p) * Math.sin(t);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      const m = new THREE.PointsMaterial({ color: 0x4a5a76, size: 1.5, sizeAttenuation: false, transparent: true, opacity: 0.55, fog: false });
+      scene.add(new THREE.Points(g, m));
+    })();
+
+    // post-processing: bloom makes the nodes glow
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 0.26);
+    composer.addPass(bloom);
 
     // picking
     const ray = new THREE.Raycaster();
@@ -105,6 +171,51 @@
     addEventListener("mousemove", (ev) => {
       mouse.x = (ev.clientX / innerWidth) * 2 - 1;
       mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+    });
+
+    // hover highlight: brighten node + neighbors, dim the rest, light incident edges
+    let hovered = -1;
+    function setHighlight(idx) {
+      if (idx === hovered) return;
+      hovered = idx;
+      const neigh = idx >= 0 ? adj[idx] : null;
+      for (let i = 0; i < nodeMeshes.length; i++) {
+        const m = nodeMeshes[i].material;
+        if (idx < 0) { m.emissiveIntensity = 0.68; m.opacity = 1; }
+        else if (i === idx) { m.emissiveIntensity = 1.7; m.opacity = 1; }
+        else if (neigh.has(i)) { m.emissiveIntensity = 1.05; m.opacity = 1; }
+        else { m.emissiveIntensity = 0.18; m.opacity = 0.42; }
+      }
+      if (idx < 0) {
+        hlGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(0), 3));
+        edgeMat.opacity = 0.22;
+      } else {
+        const pts = []; const a = NODES[idx];
+        neigh.forEach(j => { const b = NODES[j]; pts.push(a.x,a.y,a.z, b.x,b.y,b.z); });
+        hlGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(pts), 3));
+        edgeMat.opacity = 0.08;
+      }
+    }
+
+    // smooth click-to-focus (manual tween; controls take over once it lands)
+    let focusT = 1;
+    const focusFromCam = new THREE.Vector3(), focusToCam = new THREE.Vector3();
+    const focusFromTgt = new THREE.Vector3(), focusToTgt = new THREE.Vector3();
+    function startFocus(idx) {
+      const n = NODES[idx];
+      const tgt = new THREE.Vector3(n.x, n.y, n.z);
+      const viewDir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+      focusFromCam.copy(camera.position);
+      focusFromTgt.copy(controls.target);
+      focusToTgt.copy(tgt);
+      focusToCam.copy(tgt).add(viewDir.multiplyScalar(32));
+      focusT = 0;
+    }
+    // only focus on a click, not at the end of an orbit-drag
+    let downX = 0, downY = 0;
+    addEventListener("mousedown", (e) => { downX = e.clientX; downY = e.clientY; });
+    addEventListener("mouseup", (e) => {
+      if (Math.abs(e.clientX - downX) < 5 && Math.abs(e.clientY - downY) < 5 && hovered >= 0) startFocus(hovered);
     });
 
     {% if include_history %}
@@ -144,22 +255,39 @@
     _loadHistory();
     {% endif %}
 
+    const clock = new THREE.Clock();
     function tick() {
       requestAnimationFrame(tick);
-      controls.update();
+      const dt = clock.getDelta();
+
+      if (focusT < 1) {
+        focusT = Math.min(1, focusT + dt * 1.5);
+        const e = focusT * focusT * (3 - 2 * focusT); // smoothstep
+        camera.position.lerpVectors(focusFromCam, focusToCam, e);
+        controls.target.lerpVectors(focusFromTgt, focusToTgt, e);
+        camera.lookAt(controls.target);
+      } else {
+        controls.update();
+      }
+
       ray.setFromCamera(mouse, camera);
       const hits = ray.intersectObjects(nodeMeshes);
       const pickedEl = document.getElementById("picked");
       if (hits.length > 0) {
-        const n = hits[0].object.userData;
+        const mesh = hits[0].object;
+        const n = mesh.userData;
+        setHighlight(nodeMeshes.indexOf(mesh));
         pickedEl.textContent = `${n.cluster}/${n.title}\n${n.path}\nlinks: ${n.degree}`;
+        document.body.style.cursor = "pointer";
         {% if include_history %}
         _renderHistoryFor(n.path);
         {% endif %}
       } else {
+        setHighlight(-1);
         pickedEl.textContent = "";
+        document.body.style.cursor = "default";
       }
-      renderer.render(scene, camera);
+      composer.render();
     }
     tick();
 
@@ -167,6 +295,7 @@
       camera.aspect = innerWidth/innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
     });
   </script>
 </body>
