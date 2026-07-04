@@ -89,6 +89,21 @@
     .constellationItem:hover{background:var(--ash-2);border-color:var(--ecto);}
     .constellationItem.selected{border-color:var(--ecto);background:rgba(143,224,200,.09);}
 
+    #pagePicker{padding:9px 10px;border-bottom:1px solid var(--rule);
+      background:rgba(11,8,9,.22);}
+    #pagePickerRow{display:flex;gap:7px;align-items:center;}
+    #pageSelect{min-width:0;flex:1;background:var(--ash);border:1px solid var(--rule);
+      color:var(--bone);border-radius:4px;padding:8px 9px;font-family:var(--mono);font-size:11px;}
+    #pageSelect:focus{outline:none;border-color:var(--candle);
+      box-shadow:0 0 0 1px rgba(233,176,103,.18);}
+    #pageSummonSelected{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
+      border-radius:4px;padding:8px 10px;font-family:var(--ritual);font-size:10px;
+      letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
+    #pageSummonSelected:hover:not(:disabled){background:rgba(143,224,200,.18);}
+    #pageSummonSelected:disabled{opacity:.4;cursor:not-allowed;}
+    #selectionStatus{margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--mist);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
     #list{flex:1;overflow:auto;padding:8px 8px 4px;font-family:var(--mono);font-size:12px;}
     .listHint{opacity:.55;font-size:11px;padding:8px;font-style:italic;font-family:var(--serif);}
     .pageItem{padding:6px 9px;cursor:pointer;border-radius:3px;color:var(--mist);
@@ -230,6 +245,15 @@
       </form>
       <div id="ragResults"></div>
     </div>
+    <div id="pagePicker">
+      <div id="pagePickerRow">
+        <select id="pageSelect" disabled>
+          <option value="">loading spirits…</option>
+        </select>
+        <button id="pageSummonSelected" type="button" disabled>summon</button>
+      </div>
+      <div id="selectionStatus">no spirit selected</div>
+    </div>
     <div id="list"><div class="listHint">the register stirs…</div></div>
     <div id="modeRow">
       <label>circle:</label>
@@ -259,6 +283,7 @@
 <script>
 let sid = null;
 let currentTab = "pages";
+let pagesCache = [];
 
 function ritualFlash(){
   const r = document.getElementById("rift");
@@ -271,6 +296,7 @@ function switchTab(name) {
   currentTab = name;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   document.getElementById("ragSummon").style.display = name === "pages" ? "block" : "none";
+  document.getElementById("pagePicker").style.display = name === "pages" ? "block" : "none";
   if (name === "pages") loadPages();
   else loadSessions();
 }
@@ -279,8 +305,10 @@ let selectedPaths = new Set();
 
 async function loadPages(){
   const r = await fetch("/api/pages"); const j = await r.json();
+  pagesCache = Array.isArray(j) ? j : [];
+  renderPageDropdown();
   const el = document.getElementById("list"); el.innerHTML = "";
-  j.forEach(p => {
+  pagesCache.forEach(p => {
     const d = document.createElement("div"); d.className="pageItem";
     d.textContent = p.path;
     d.dataset.path = p.path;
@@ -295,7 +323,65 @@ async function loadPages(){
     d.ondblclick = () => singleSummonOnDoubleClick(p.path);
     el.appendChild(d);
   });
-  updateModeRow();
+  updateSelectionControls();
+}
+
+function renderPageDropdown(){
+  const select = document.getElementById("pageSelect");
+  select.innerHTML = "";
+  if (pagesCache.length === 0){
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "no spirits indexed";
+    select.appendChild(opt);
+    select.disabled = true;
+    return;
+  }
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "choose a page…";
+  select.appendChild(placeholder);
+  pagesCache.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.path;
+    opt.textContent = p.title ? `${p.title} — ${p.path}` : p.path;
+    select.appendChild(opt);
+  });
+  select.disabled = false;
+}
+
+document.getElementById("pageSelect").onchange = (ev) => {
+  const path = ev.target.value;
+  if (!path) return;
+  addPageSelection(path);
+  ev.target.value = "";
+};
+
+document.getElementById("pageSummonSelected").onclick = () => {
+  const paths = [...selectedPaths];
+  if (paths.length === 0){ toast("choose a spirit first"); return; }
+  if (paths.length === 1){
+    selectedPaths.clear();
+    syncSelectionDom();
+    updateSelectionControls();
+    summon(paths[0]);
+    return;
+  }
+  summonRoundtable();
+};
+
+function addPageSelection(path){
+  if (selectedPaths.has(path)){
+    toast("that spirit is already in the circle");
+    return;
+  }
+  if (selectedPaths.size >= 8){
+    toast("the circle holds at most 8 spirits");
+    return;
+  }
+  selectedPaths.add(path);
+  syncSelectionDom();
+  updateSelectionControls();
 }
 
 function togglePageSelection(path, el){
@@ -308,7 +394,7 @@ function togglePageSelection(path, el){
     selectedPaths.add(path);
   }
   syncSelectionDom();
-  updateModeRow();
+  updateSelectionControls();
 }
 
 function syncSelectionDom(){
@@ -330,9 +416,25 @@ function updateModeRow(){
   }
 }
 
+function updateSelectionControls(){
+  updateModeRow();
+  const count = selectedPaths.size;
+  const btn = document.getElementById("pageSummonSelected");
+  const status = document.getElementById("selectionStatus");
+  btn.disabled = count === 0;
+  btn.textContent = count >= 2 ? "summon circle" : "summon";
+  if (count === 0){
+    status.textContent = "no spirit selected";
+    return;
+  }
+  const names = [...selectedPaths].map(path => path.split("/").pop().replace(/\.md$/, ""));
+  status.textContent = `${count} selected: ${names.join(", ")}`;
+}
+
 function singleSummonOnDoubleClick(path){
   selectedPaths.clear();
   syncSelectionDom();
+  updateSelectionControls();
   summon(path);  // legacy single-page summon (Phase-10a path)
 }
 
@@ -376,7 +478,7 @@ async function summonRoundtable(){
   // Clear selection
   selectedPaths.clear();
   syncSelectionDom();
-  updateModeRow();
+  updateSelectionControls();
 }
 
 document.getElementById("ragForm").onsubmit = async (ev) => {
@@ -451,7 +553,7 @@ function selectConstellation(paths){
   if (paths.length > 8){ toast("the circle holds at most 8 spirits"); return; }
   selectedPaths = new Set(paths);
   syncSelectionDom();
-  updateModeRow();
+  updateSelectionControls();
 }
 
 function renderConstellations(constellations){
