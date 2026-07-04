@@ -20,6 +20,7 @@ outside that scope, respond honestly: "Das wusste ich damals nicht." /
 
 # Pages you linked to (your neighbors)
 {neighbors}
+{semantic_neighbor_block}
 
 # Voice — how you speak
 {voice_block}
@@ -116,11 +117,24 @@ oder ergänze, aus deiner Perspektive.
 _TOOL_USE_BLOCK = """
 # Calling consult_neighbor
 You have access to a tool `consult_neighbor(neighbor_path)` that fetches the
-opening excerpt of one of your neighbors. When you would benefit from what a
-neighbor knows, call the tool with the neighbor's EXACT relpath as listed
-above (e.g. `concepts/a2a-protokoll.md`, NOT just the title `a2a-protokoll`,
-NOT a guess based on your own path). Only paths in your neighbor list are
-allowed; any other path will be refused.
+opening excerpt of one of the listed consultable pages. When you would benefit
+from what another page knows, call the tool with the page's EXACT relpath as
+listed above (e.g. `concepts/a2a-protokoll.md`, NOT just the title
+`a2a-protokoll`, NOT a guess based on your own path). Only paths listed in
+your neighbor, roundtable, or semantic archive sections are allowed; any other
+path will be refused.
+"""
+
+
+def _format_semantic_neighbors(paths: list[str] | None) -> str:
+    if not paths:
+        return ""
+    lines = "\n".join(f"  - `{p}`" for p in paths)
+    return f"""
+# Semantically nearby archive pages
+These pages are not pages you linked to at the time. Treat them as external
+archive context you may consult, not as facts you originally knew.
+{lines}
 """
 
 
@@ -129,6 +143,7 @@ def build_system_prompt(
     neighbor_titles: list[str],
     neighbor_paths: list[str] | None = None,
     teammate_paths: list[str] | None = None,
+    semantic_neighbor_paths: list[str] | None = None,
 ) -> str:
     voice_block = build_voice_block(persona)
     themes = ", ".join(persona.get("themes", [])) or "(none)"
@@ -138,6 +153,9 @@ def build_system_prompt(
     else:
         neighbors = ", ".join(neighbor_titles) or "(none)"
         tool_use_block = ""
+    semantic_neighbor_block = _format_semantic_neighbors(semantic_neighbor_paths)
+    if semantic_neighbor_block and not tool_use_block:
+        tool_use_block = _TOOL_USE_BLOCK
 
     if teammate_paths:
         teammate_lines = "\n".join(f"  - `{p}`" for p in teammate_paths)
@@ -151,6 +169,7 @@ def build_system_prompt(
         era_marker=persona.get("era_marker") or "unknown date",
         themes=themes,
         neighbors=neighbors,
+        semantic_neighbor_block=semantic_neighbor_block,
         voice_block=voice_block,
         body_excerpt=persona.get("body_excerpt", "") or "(empty body)",
         tool_use_block=tool_use_block + teammate_block,

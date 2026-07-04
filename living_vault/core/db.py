@@ -102,6 +102,7 @@ _PHASE_10A_SEANCE_MESSAGES_COLUMNS = [
 # Phase-10b additive columns + new tables.
 _PHASE_10B_SEANCE_SESSIONS_COLUMNS = [
     ("mode", "TEXT NOT NULL DEFAULT 'single'"),
+    ("semantic_neighbors", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 _EMBEDDINGS_BLOB_COLUMNS = [

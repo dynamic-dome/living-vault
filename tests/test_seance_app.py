@@ -4,6 +4,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from living_vault.core import db as db_mod
+from living_vault.core import embeddings as embeddings_mod
+from living_vault.core.embeddings import NumpyBackend, index_embeddings
 from living_vault.core.indexer import index_vault
 
 
@@ -28,6 +30,66 @@ def test_list_pages_returns_all(vault_copy, db_path, monkeypatch):
     assert "concepts/note-a.md" in paths
 
 
+def test_summon_candidates_endpoint_returns_candidates(vault_copy, db_path, monkeypatch):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+
+    r = c.post("/api/summon-candidates", json={"query": "alpha topics", "limit": 8})
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["query"] == "alpha topics"
+    assert len(body["candidates"]) > 0
+    assert body["candidates"][0]["reason"] == "semantic match"
+    assert "body" not in body["candidates"][0]
+    assert "C:" not in body["candidates"][0]["path"]
+
+
+def test_summon_candidates_endpoint_rejects_empty_query(vault_copy, db_path, monkeypatch):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+
+    r = c.post("/api/summon-candidates", json={"query": "   "})
+
+    assert r.status_code == 400
+    assert "empty" in r.text.lower()
+
+
+def test_summon_candidates_endpoint_rejects_oversized_query(vault_copy, db_path, monkeypatch):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+
+    r = c.post("/api/summon-candidates", json={"query": "x" * 1001})
+
+    assert r.status_code == 413
+    assert "too long" in r.text.lower()
+
+
+def test_constellations_endpoint_returns_metadata_only(vault_copy, db_path, monkeypatch):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+
+    r = c.post("/api/constellations", json={"query": "alpha topics", "limit": 3, "size": 3})
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["query"] == "alpha topics"
+    assert body["constellations"]
+    first = body["constellations"][0]
+    assert set(first) == {"label", "reason", "paths", "titles"}
+    assert "body" not in first
+    assert all("C:" not in path for path in first["paths"])
+    assert 2 <= len(first["paths"]) <= 3
+
+
 def test_summon_creates_session_and_responds(vault_copy, db_path, monkeypatch):
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
@@ -37,7 +99,11 @@ def test_summon_creates_session_and_responds(vault_copy, db_path, monkeypatch):
     sid = r.json()["session_id"]
     r2 = c.post(f"/api/say", json={"session_id": sid, "text": "who are you?"})
     assert r2.status_code == 200
-    assert "fake echo" in r2.json()["reply"]
+    body = r2.json()
+    assert "fake echo" in body["reply"]
+    assert body["evidence"]["own_page"] == "concepts/note-a.md"
+    assert body["evidence"]["consulted_paths"] == []
+    assert "body" not in body["evidence"]
 
 
 def test_summon_unknown_path_404(vault_copy, db_path, monkeypatch):
@@ -87,6 +153,33 @@ def test_get_session_detail_404(vault_copy, db_path, monkeypatch):
     index_vault(vault_copy, db_path)
     c = _client(vault_copy, db_path, monkeypatch)
     r = c.get("/api/sessions/9999")
+    assert r.status_code == 404
+
+
+def test_belief_evolution_endpoint_returns_trace(vault_copy, db_path, monkeypatch):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    sid = c.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+    c.post("/api/say", json={"session_id": sid, "text": "who are you?"})
+
+    r = c.get(f"/api/sessions/{sid}/belief-evolution")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["session_id"] == sid
+    assert body["participants"] == ["concepts/note-a.md"]
+    assert body["turn_count"] == 1
+    assert body["persona_arcs"][0]["persona_path"] == "concepts/note-a.md"
+
+
+def test_belief_evolution_endpoint_404(vault_copy, db_path, monkeypatch):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+
+    r = c.get("/api/sessions/9999/belief-evolution")
+
     assert r.status_code == 404
 
 
@@ -297,6 +390,41 @@ def test_summon_with_paths_and_mode_creates_session_personas(vault_copy, db_path
 
     # mode persisted on session
     assert store.get_session_mode(db_path, sid) == "roundrobin"
+
+
+def test_summon_accepts_auto_mode(vault_copy, db_path, monkeypatch):
+    from living_vault.apps.seance_ui import store
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "auto",
+    })
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["mode"] == "auto"
+    assert store.get_session_mode(db_path, body["session_id"]) == "auto"
+
+
+def test_summon_persists_semantic_neighbors_opt_in(vault_copy, db_path, monkeypatch):
+    from living_vault.apps.seance_ui import store
+
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    c = _client(vault_copy, db_path, monkeypatch)
+    r = c.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "auto",
+        "semantic_neighbors": True,
+    })
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["semantic_neighbors"] is True
+    assert store.get_session_semantic_neighbors(db_path, body["session_id"]) is True
 
 
 def test_summon_with_legacy_path_keyword_still_works(vault_copy, db_path, monkeypatch):

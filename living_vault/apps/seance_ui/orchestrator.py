@@ -19,9 +19,11 @@ from living_vault.apps.seance_ui.neighbors import (
     CONSULT_NEIGHBOR_TOOL_DEF,
     make_consult_neighbor_handler,
 )
+from living_vault.apps.seance_ui.semantic_neighbors import semantic_neighbors_for_persona
 from living_vault.apps.seance_ui.roundtable import (
     VALID_MODES,
     hash_color,
+    pick_auto_speakers,
     pick_speakers,
     shared_history_for_persona,
 )
@@ -58,12 +60,55 @@ def _cap_history(history: list[tuple[str, str]]) -> list[tuple[str, str]]:
     return capped
 
 
+def _routing_label(mode: str) -> str:
+    if mode == "auto":
+        return "auto-moderator selected this persona from the current circle"
+    if mode == "moderator":
+        return "moderator mode selected this persona"
+    if mode == "roundrobin":
+        return "round-robin turn order selected this persona"
+    if mode == "freeforall":
+        return "free-for-all invited every persona in the circle"
+    return "single persona"
+
+
+def _build_evidence(
+    *,
+    persona_path: str,
+    mode: str,
+    tool_events: list[dict],
+    semantic_paths: list[str] | None = None,
+) -> dict:
+    consulted_paths: list[str] = []
+    seen: set[str] = set()
+    for event in tool_events:
+        if event.get("tool_name") != "consult_neighbor":
+            continue
+        summary = event.get("tool_result_summary") or {}
+        if "error" in summary:
+            continue
+        args = event.get("tool_args") or {}
+        path = args.get("neighbor_path")
+        if isinstance(path, str) and path not in seen:
+            consulted_paths.append(path)
+            seen.add(path)
+    return {
+        "persona_path": persona_path,
+        "mode": mode,
+        "own_page": persona_path,
+        "consulted_paths": consulted_paths,
+        "semantic_paths": semantic_paths or [],
+        "routing": _routing_label(mode),
+    }
+
+
 def summon_session(
     db_path: Path,
     vault_root: Path,
     *,
     page_paths: list[str],
     mode: str = "single",
+    semantic_neighbors: bool = False,
 ) -> dict:
     """Create a new séance session for the given pages.
 
@@ -102,7 +147,12 @@ def summon_session(
 
     # Create session — page_path is paths[0] for legacy compatibility with
     # the existing /api/say flow that reads page_path from seance_sessions.
-    sid = store.new_session(db_path, page_path=paths[0], mode=effective_mode)
+    sid = store.new_session(
+        db_path,
+        page_path=paths[0],
+        mode=effective_mode,
+        semantic_neighbors=semantic_neighbors,
+    )
 
     # Add personas + assemble response personas array in one pass.
     personas_out: list[dict] = []
@@ -114,6 +164,7 @@ def summon_session(
     return {
         "session_id": sid,
         "mode": effective_mode,
+        "semantic_neighbors": semantic_neighbors,
         "personas": personas_out,
         # Backward-compat: legacy callers expect a `persona` field with the
         # first page's full persona dict. Reuse the validation-loop result.
@@ -148,10 +199,19 @@ def say_single(
     persona = build_persona(vault_root, db_path, page_path)
     if persona is None:
         raise SéanceError(410, "page gone since session start")
+    semantic_enabled = store.get_session_semantic_neighbors(db_path, session_id)
+    semantic_paths = []
+    if semantic_enabled:
+        semantic_paths = semantic_neighbors_for_persona(
+            db_path,
+            page_path,
+            exclude=nbs,
+        )
     system = build_system_prompt(
         persona,
         neighbor_titles=[Path(n).stem for n in nbs],
         neighbor_paths=list(nbs),
+        semantic_neighbor_paths=semantic_paths,
     )
 
     # Persist user turn first so it's in DB even if the LLM call fails.
@@ -162,7 +222,7 @@ def say_single(
         db_path=db_path,
         session_id=session_id,
         persona_path=page_path,
-        allowlist=set(nbs),
+        allowlist=set(nbs) | set(semantic_paths),
     )
 
     tool_events: list[dict] = []
@@ -199,7 +259,16 @@ def say_single(
         reply = llm.respond(system=system, history=history_for_llm)
 
     store.add_message(db_path, session_id, "assistant", reply, persona_path=page_path)
-    return {"reply": reply, "tool_events": tool_events}
+    return {
+        "reply": reply,
+        "tool_events": tool_events,
+        "evidence": _build_evidence(
+            persona_path=page_path,
+            mode="single",
+            tool_events=tool_events,
+            semantic_paths=semantic_paths,
+        ),
+    }
 
 
 def say_roundtable(
@@ -224,17 +293,26 @@ def say_roundtable(
 
     # re-fetch mode for self-containedness.
     mode = store.get_session_mode(db_path, session_id)
+    semantic_enabled = store.get_session_semantic_neighbors(db_path, session_id)
     turn_idx = store.count_user_turns(db_path, session_id)  # 0-indexed for THIS upcoming turn
 
     # Persist user turn first so it's in DB even if any LLM call fails.
     store.add_message(db_path, session_id, "user", text, persona_path=None)
 
-    speakers = pick_speakers(
-        mode=mode,
-        user_text=text,
-        personas=personas,
-        turn_idx=turn_idx,
-    )
+    if mode == "auto":
+        speakers = pick_auto_speakers(
+            db_path=db_path,
+            user_text=text,
+            personas=personas,
+            turn_idx=turn_idx,
+        )
+    else:
+        speakers = pick_speakers(
+            mode=mode,
+            user_text=text,
+            personas=personas,
+            turn_idx=turn_idx,
+        )
 
     replies: list[dict] = []
     tool_events: list[dict] = []
@@ -262,16 +340,24 @@ def say_roundtable(
         finally:
             con.close()
         teammate_paths = [p for p in persona_paths_ordered if p != speaker_path]
+        semantic_paths = []
+        if semantic_enabled:
+            semantic_paths = semantic_neighbors_for_persona(
+                db_path,
+                speaker_path,
+                exclude=set(nbs) | set(teammate_paths),
+            )
 
         system = build_system_prompt(
             persona_data,
             neighbor_titles=[Path(n).stem for n in nbs],
             neighbor_paths=list(nbs),
             teammate_paths=teammate_paths,
+            semantic_neighbor_paths=semantic_paths,
         )
 
-        # Allowlist: graph neighbors + teammates (cross-persona consult allowed)
-        allowlist = set(nbs) | set(teammate_paths)
+        # Allowlist: graph neighbors + teammates + opt-in semantic archive pages.
+        allowlist = set(nbs) | set(teammate_paths) | set(semantic_paths)
         raw_handler = make_consult_neighbor_handler(
             vault_root=vault_root,
             db_path=db_path,
@@ -335,6 +421,12 @@ def say_roundtable(
             "text": reply,
             "color": speaker["color"],
             "seat_idx": speaker["seat_idx"],
+            "evidence": _build_evidence(
+                persona_path=speaker_path,
+                mode=mode,
+                tool_events=speaker_tool_events,
+                semantic_paths=semantic_paths,
+            ),
         })
         tool_events.extend(speaker_tool_events)
 

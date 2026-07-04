@@ -11,12 +11,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def new_session(db_path: Path, page_path: str, mode: str = "single") -> int:
+def new_session(
+    db_path: Path,
+    page_path: str,
+    mode: str = "single",
+    *,
+    semantic_neighbors: bool = False,
+) -> int:
     con = db_mod.connect(db_path)
     try:
         cur = con.execute(
-            "INSERT INTO seance_sessions(page_path, started_at, mode) VALUES (?, ?, ?)",
-            (page_path, _now(), mode),
+            "INSERT INTO seance_sessions(page_path, started_at, mode, semantic_neighbors) "
+            "VALUES (?, ?, ?, ?)",
+            (page_path, _now(), mode, int(semantic_neighbors)),
         )
         con.commit()
         return int(cur.lastrowid)
@@ -205,5 +212,18 @@ def get_session_mode(db_path: Path, session_id: int) -> str | None:
             (session_id,),
         ).fetchone()
         return row["mode"] if row else None
+    finally:
+        con.close()
+
+
+def get_session_semantic_neighbors(db_path: Path, session_id: int) -> bool:
+    """Return whether semantic-neighbor consults are enabled for a session."""
+    con = db_mod.connect(db_path)
+    try:
+        row = con.execute(
+            "SELECT semantic_neighbors FROM seance_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        return bool(row["semantic_neighbors"]) if row else False
     finally:
         con.close()

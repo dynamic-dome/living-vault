@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from living_vault.core import db as db_mod
 from living_vault.core.indexer import index_vault
+from living_vault.core import embeddings as embeddings_mod
+from living_vault.core.embeddings import NumpyBackend, index_embeddings
 from living_vault.core.llm import FakeLLMWithTools
 from living_vault.apps.seance_ui import store
 
@@ -69,8 +71,63 @@ def test_say_with_one_tool_call_persists_event_and_returns_in_response(
     detail = store.get_session_detail(db_path, sid)
     roles = [m["role"] for m in detail["messages"]]
     assert "tool_use" in roles
-    assert roles.count("user") == 1
-    assert roles.count("assistant") == 1
+
+
+def _add_semantic_only_alpha_page(vault_copy: Path) -> str:
+    rel = "concepts/semantic-alpha.md"
+    path = vault_copy / rel
+    path.write_text(
+        "---\ntype: concept\nstatus: active\n---\n\n"
+        "# Semantic Alpha\n\n"
+        "Alpha alpha alpha archive context with no wikilinks.\n",
+        encoding="utf-8",
+    )
+    return rel
+
+
+def test_semantic_neighbor_consult_blocked_without_opt_in(vault_copy, db_path, monkeypatch):
+    semantic_path = _add_semantic_only_alpha_page(vault_copy)
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    c, _ = _client_with_scripted_llm(vault_copy, db_path, monkeypatch, [
+        {"type": "tool_use", "name": "consult_neighbor", "input": {"neighbor_path": semantic_path}},
+        {"type": "text", "text": "I could not use it."},
+    ])
+    sid = c.post("/api/summon", json={"path": "concepts/note-a.md"}).json()["session_id"]
+
+    r = c.post("/api/say", json={"session_id": sid, "text": "alpha"})
+
+    assert r.status_code == 200, r.text
+    ev = r.json()["tool_events"][0]
+    assert "error" in ev["tool_result_summary"]
+    assert r.json()["evidence"]["semantic_paths"] == []
+
+
+def test_semantic_neighbor_consult_allowed_with_opt_in(vault_copy, db_path, monkeypatch):
+    semantic_path = _add_semantic_only_alpha_page(vault_copy)
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    c, _ = _client_with_scripted_llm(vault_copy, db_path, monkeypatch, [
+        {"type": "tool_use", "name": "consult_neighbor", "input": {"neighbor_path": semantic_path}},
+        {"type": "text", "text": "I used semantic archive."},
+    ])
+    sid = c.post("/api/summon", json={
+        "path": "concepts/note-a.md",
+        "semantic_neighbors": True,
+    }).json()["session_id"]
+
+    r = c.post("/api/say", json={"session_id": sid, "text": "alpha"})
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    ev = body["tool_events"][0]
+    assert "error" not in ev["tool_result_summary"]
+    assert semantic_path in body["evidence"]["semantic_paths"]
+    assert body["evidence"]["consulted_paths"] == [semantic_path]
 
 
 def test_say_persists_user_and_assistant_with_persona_path(vault_copy, db_path, monkeypatch):

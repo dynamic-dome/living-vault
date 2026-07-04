@@ -14,6 +14,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from living_vault.core import db as db_mod
+from living_vault.core.embeddings import search_semantic
+
 
 # 8-color palette tuned for the dark séance UI theme.
 PALETTE: list[str] = [
@@ -33,8 +36,8 @@ PALETTE: list[str] = [
 # only accepts the three roundtable modes — single-mode sessions never reach
 # pick_speakers because say() branches on mode and routes single → existing
 # Phase-10a path, not roundtable_say.
-VALID_MODES = frozenset({"single", "roundrobin", "moderator", "freeforall"})
-ROUNDTABLE_MODES = frozenset({"roundrobin", "moderator", "freeforall"})
+VALID_MODES = frozenset({"single", "roundrobin", "moderator", "freeforall", "auto"})
+ROUNDTABLE_MODES = frozenset({"roundrobin", "moderator", "freeforall", "auto"})
 
 
 def hash_color(persona_path: str) -> str:
@@ -110,6 +113,49 @@ def pick_speakers(
         return [personas[turn_idx % len(personas)]]
 
     raise ValueError(f"unknown mode: {mode}")
+
+
+def pick_auto_speakers(
+    *,
+    db_path,
+    user_text: str,
+    personas: list[dict],
+    turn_idx: int,
+    max_speakers: int = 3,
+) -> list[dict]:
+    """Pick relevant already-summoned personas using semantic search.
+
+    The search may return any page in the DB, but this function only admits
+    paths already present in the current session's persona list.
+    """
+    if not personas:
+        return []
+    if not user_text.strip():
+        return [personas[turn_idx % len(personas)]]
+
+    by_path = {p["persona_path"]: p for p in personas}
+    seats = {p["persona_path"]: p.get("seat_idx", i) for i, p in enumerate(personas)}
+    k = max(16, len(personas) * 3)
+    con = db_mod.connect(db_path)
+    try:
+        rows = search_semantic(con, user_text, k=k)
+    finally:
+        con.close()
+
+    scored: list[tuple[float, int, dict]] = []
+    seen: set[str] = set()
+    for path, score in rows:
+        if path not in by_path or path in seen or score <= 0:
+            continue
+        seen.add(path)
+        scored.append((score, seats[path], by_path[path]))
+
+    if not scored:
+        return [personas[turn_idx % len(personas)]]
+
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    cap = max(1, min(max_speakers, len(personas)))
+    return [p for _, _, p in scored[:cap]]
 
 
 def shared_history_for_persona(

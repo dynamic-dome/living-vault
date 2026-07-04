@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from living_vault.core import db as db_mod
+from living_vault.core import embeddings as embeddings_mod
+from living_vault.core.embeddings import NumpyBackend, index_embeddings
 from living_vault.core.indexer import index_vault
 from living_vault.core.llm import FakeLLMWithTools
 from living_vault.apps.seance_ui import store
@@ -97,6 +99,30 @@ def test_roundrobin_alternates_speakers_across_turns(vault_copy, db_path, monkey
     assert r3.json()["replies"][0]["persona_path"] == "concepts/note-a.md"  # wrap
 
 
+def test_roundtable_auto_mode_routes_to_semantic_speaker(vault_copy, db_path, monkeypatch):
+    monkeypatch.setattr(embeddings_mod, "get_backend", lambda: NumpyBackend())
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    index_embeddings(vault_copy, db_path)
+    scripts = [[{"type": "text", "text": "B speaks"}]]
+    client, _ = _client_with_iter_llms(vault_copy, db_path, monkeypatch, scripts)
+    sid = client.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "auto",
+    }).json()["session_id"]
+
+    r = client.post("/api/say", json={"session_id": sid, "text": "beta"})
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["replies"]) == 1
+    assert body["replies"][0]["persona_path"] == "concepts/note-b.md"
+    assert body["replies"][0]["text"] == "B speaks"
+    assert body["replies"][0]["evidence"]["mode"] == "auto"
+    assert body["replies"][0]["evidence"]["own_page"] == "concepts/note-b.md"
+    assert "body" not in body["replies"][0]["evidence"]
+
+
 def test_moderator_at_mention_picks_one_persona(vault_copy, db_path, monkeypatch):
     db_mod.initialize(db_path)
     index_vault(vault_copy, db_path)
@@ -187,6 +213,33 @@ def test_cross_persona_consult_is_allowed(vault_copy, db_path, monkeypatch):
     # the consulted neighbor was B (teammate)
     consult_events = [e for e in body["tool_events"] if e["tool_name"] == "consult_neighbor"]
     assert any(e["tool_args"]["neighbor_path"] == "concepts/note-b.md" for e in consult_events)
+    reply_a = next(r for r in body["replies"] if r["persona_path"] == "concepts/note-a.md")
+    assert reply_a["evidence"]["consulted_paths"] == ["concepts/note-b.md"]
+    assert "C:" not in reply_a["evidence"]["own_page"]
+
+
+def test_roundtable_reply_includes_evidence(vault_copy, db_path, monkeypatch):
+    db_mod.initialize(db_path)
+    index_vault(vault_copy, db_path)
+    scripts = [[{"type": "text", "text": "A with evidence"}]]
+    client, _ = _client_with_iter_llms(vault_copy, db_path, monkeypatch, scripts)
+    sid = client.post("/api/summon", json={
+        "paths": ["concepts/note-a.md", "concepts/note-b.md"],
+        "mode": "roundrobin",
+    }).json()["session_id"]
+
+    r = client.post("/api/say", json={"session_id": sid, "text": "go"})
+
+    assert r.status_code == 200, r.text
+    reply = r.json()["replies"][0]
+    assert reply["evidence"] == {
+        "persona_path": "concepts/note-a.md",
+        "mode": "roundrobin",
+        "own_page": "concepts/note-a.md",
+        "consulted_paths": [],
+        "semantic_paths": [],
+        "routing": "round-robin turn order selected this persona",
+    }
 
 
 def test_skip_broken_persona_other_two_still_reply(vault_copy, db_path, monkeypatch):

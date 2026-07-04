@@ -173,7 +173,8 @@ def test_system_prompt_no_teammate_block_when_paths_empty():
         teammate_paths=[],
     )
     # empty list: no teammate-block content
-    assert "Tisch" not in out and "teammates" not in out.lower() and "roundtable" not in out.lower()
+    assert "Other personas at the table" not in out
+    assert "Tisch" not in out and "teammates" not in out.lower()
 
 
 def test_system_prompt_teammate_paths_optional_for_phase10a_compat():
@@ -187,3 +188,18 @@ def test_system_prompt_teammate_paths_optional_for_phase10a_compat():
     # no teammate context, no roundtable mention
     assert "concepts/x.md" in out
     assert "Tisch" not in out
+
+
+def test_system_prompt_includes_semantic_archive_block_when_provided():
+    p = _persona_full()
+    out = build_system_prompt(
+        p,
+        neighbor_titles=["x"],
+        neighbor_paths=["concepts/x.md"],
+        semantic_neighbor_paths=["concepts/semantic.md"],
+    )
+
+    assert "Semantically nearby archive pages" in out
+    assert "concepts/semantic.md" in out
+    assert "not pages you linked to at the time" in out
+    assert "consult_neighbor" in out

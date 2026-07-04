@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>séance</title>
+  <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -62,6 +63,32 @@
     .tab.active{color:var(--candle);background:rgba(233,176,103,.06);
       box-shadow:inset 0 -2px 0 var(--candle);}
 
+    #ragSummon{padding:10px 10px 8px;border-bottom:1px solid var(--rule);
+      background:rgba(233,176,103,.035);}
+    #ragForm{display:flex;gap:7px;}
+    #ragQuery{min-width:0;flex:1;background:var(--ash);border:1px solid var(--rule);
+      color:var(--bone);border-radius:4px;padding:8px 9px;font-family:var(--mono);font-size:11px;}
+    #ragQuery::placeholder{color:var(--mist);opacity:.75;}
+    #ragQuery:focus{outline:none;border-color:var(--candle);
+      box-shadow:0 0 0 1px rgba(233,176,103,.18);}
+    #ragSeek,#ragCircles{background:transparent;color:var(--candle);border:1px solid var(--gild);
+      border-radius:4px;padding:8px 10px;font-family:var(--ritual);font-size:10px;
+      letter-spacing:.14em;text-transform:uppercase;cursor:pointer;}
+    #ragSeek:hover:not(:disabled),#ragCircles:hover:not(:disabled){background:rgba(233,176,103,.1);}
+    #ragSeek:disabled,#ragCircles:disabled{opacity:.45;cursor:not-allowed;}
+    #ragResults{margin-top:8px;display:none;}
+    #ragResults.visible{display:block;}
+    .ragItem{padding:7px 8px;margin-top:5px;border:1px solid var(--rule);border-radius:4px;
+      background:rgba(11,8,9,.34);cursor:pointer;transition:background .15s,border-color .15s;}
+    .ragItem:hover{background:var(--ash-2);border-color:var(--gild);}
+    .ragItem.selected{border-color:var(--ecto);background:rgba(143,224,200,.08);}
+    .ragPath{font-family:var(--mono);font-size:11px;color:var(--bone);overflow-wrap:anywhere;}
+    .ragMeta{font-family:var(--mono);font-size:10px;color:var(--mist);margin-top:3px;}
+    .constellationItem{padding:8px 9px;margin-top:6px;border:1px solid var(--rule);border-radius:4px;
+      background:rgba(143,224,200,.045);cursor:pointer;transition:background .15s,border-color .15s;}
+    .constellationItem:hover{background:var(--ash-2);border-color:var(--ecto);}
+    .constellationItem.selected{border-color:var(--ecto);background:rgba(143,224,200,.09);}
+
     #list{flex:1;overflow:auto;padding:8px 8px 4px;font-family:var(--mono);font-size:12px;}
     .listHint{opacity:.55;font-size:11px;padding:8px;font-style:italic;font-family:var(--serif);}
     .pageItem{padding:6px 9px;cursor:pointer;border-radius:3px;color:var(--mist);
@@ -83,6 +110,9 @@
     #modeRow label{letter-spacing:.1em;text-transform:uppercase;font-size:10px;}
     #modeRow select{background:var(--ash);color:var(--bone);border:1px solid var(--rule);
       padding:5px 6px;font-family:var(--mono);font-size:11px;border-radius:3px;}
+    #semanticToggle{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
+      color:var(--mist);letter-spacing:.08em;text-transform:uppercase;}
+    #semanticToggle input{accent-color:var(--ecto);}
     #summonBtn{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
       padding:7px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:10px;
       letter-spacing:.16em;text-transform:uppercase;transition:background .2s, box-shadow .2s;}
@@ -95,11 +125,12 @@
       margin-bottom:12px;padding-bottom:11px;border-bottom:1px solid var(--rule);}
     #who{font-family:var(--mono);font-size:12px;color:var(--mist);letter-spacing:.03em;}
     #who .liveDot{color:var(--ecto);}
-    #exportBtn{background:transparent;color:var(--gild);border:1px solid var(--gild);
+    #headerActions{display:flex;gap:8px;align-items:center;}
+    #exportBtn,#traceBtn{background:transparent;color:var(--gild);border:1px solid var(--gild);
       padding:6px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:10px;
       letter-spacing:.16em;text-transform:uppercase;transition:background .2s, color .2s;}
-    #exportBtn:hover:not(:disabled){background:var(--gild);color:var(--void);}
-    #exportBtn:disabled{opacity:.35;cursor:not-allowed;}
+    #exportBtn:hover:not(:disabled),#traceBtn:hover:not(:disabled){background:var(--gild);color:var(--void);}
+    #exportBtn:disabled,#traceBtn:disabled{opacity:.35;cursor:not-allowed;}
 
     #log{flex:1;overflow:auto;font-size:17px;line-height:1.62;padding-right:6px;}
 
@@ -122,6 +153,11 @@
       border-left:3px solid var(--ecto);box-shadow:0 0 30px -12px rgba(143,224,200,.4);padding-left:15px;}
     .personaLabel{font-family:var(--ritual);font-size:11px;font-weight:600;letter-spacing:.2em;
       text-transform:uppercase;color:var(--ecto);margin-bottom:6px;text-shadow:0 0 12px rgba(143,224,200,.4);}
+    .evidenceVeil{margin-top:8px;border-top:1px solid rgba(143,224,200,.16);padding-top:6px;
+      font-family:var(--mono);font-size:10px;color:var(--mist);}
+    .evidenceVeil summary{cursor:pointer;color:var(--candle-soft);letter-spacing:.08em;text-transform:uppercase;}
+    .evidenceVeil div{margin-top:4px;overflow-wrap:anywhere;}
+    .traceBlock{white-space:pre-line;font-family:var(--mono);font-size:12px;line-height:1.45;}
 
     /* tool events — the apparatus, faint and technical */
     .toolEvent{margin:7px 0 6px 14px;padding:4px 12px;border-left:2px solid rgba(143,224,200,.4);
@@ -186,21 +222,34 @@
       <div class="tab active" data-tab="pages" onclick="switchTab('pages')">spirits</div>
       <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">records</div>
     </div>
+    <div id="ragSummon">
+      <form id="ragForm">
+        <input id="ragQuery" autocomplete="off" maxlength="1000" placeholder="ask which spirits should gather…" />
+        <button id="ragSeek" type="submit">seek</button>
+        <button id="ragCircles" type="button">circles</button>
+      </form>
+      <div id="ragResults"></div>
+    </div>
     <div id="list"><div class="listHint">the register stirs…</div></div>
     <div id="modeRow">
       <label>circle:</label>
       <select id="modeSelect">
         <option value="roundrobin">round-robin</option>
         <option value="moderator">moderator (@-mention)</option>
+        <option value="auto">auto-moderator</option>
         <option value="freeforall">free-for-all</option>
       </select>
+      <label id="semanticToggle"><input id="semanticNeighbors" type="checkbox" /> semantic archive</label>
       <button id="summonBtn" onclick="summonRoundtable()">summon the circle</button>
     </div>
   </div>
   <div id="chat">
     <div id="header">
       <div id="who">the circle is empty — choose a spirit</div>
-      <button id="exportBtn" disabled onclick="exportSession()">seal record</button>
+      <div id="headerActions">
+        <button id="traceBtn" disabled onclick="traceBeliefs()">trace</button>
+        <button id="exportBtn" disabled onclick="exportSession()">seal record</button>
+      </div>
     </div>
     <div id="log"></div>
     <form id="form"><input id="txt" autocomplete="off" placeholder="speak into the dark…" disabled /><button id="send" disabled>ask</button></form>
@@ -221,6 +270,7 @@ function ritualFlash(){
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.getElementById("ragSummon").style.display = name === "pages" ? "block" : "none";
   if (name === "pages") loadPages();
   else loadSessions();
 }
@@ -251,15 +301,24 @@ async function loadPages(){
 function togglePageSelection(path, el){
   if (selectedPaths.has(path)){
     selectedPaths.delete(path);
-    el.classList.remove("selected");
   } else if (selectedPaths.size >= 8){
     toast("the circle holds at most 8 spirits");
     return;
   } else {
     selectedPaths.add(path);
-    el.classList.add("selected");
   }
+  syncSelectionDom();
   updateModeRow();
+}
+
+function syncSelectionDom(){
+  document.querySelectorAll(".pageItem,.ragItem").forEach(el => {
+    el.classList.toggle("selected", selectedPaths.has(el.dataset.path));
+  });
+  document.querySelectorAll(".constellationItem").forEach(el => {
+    const paths = JSON.parse(el.dataset.paths || "[]");
+    el.classList.toggle("selected", paths.length > 0 && paths.every(p => selectedPaths.has(p)));
+  });
 }
 
 function updateModeRow(){
@@ -273,13 +332,14 @@ function updateModeRow(){
 
 function singleSummonOnDoubleClick(path){
   selectedPaths.clear();
-  document.querySelectorAll(".pageItem.selected").forEach(el => el.classList.remove("selected"));
+  syncSelectionDom();
   summon(path);  // legacy single-page summon (Phase-10a path)
 }
 
 async function summonRoundtable(){
   if (selectedPaths.size < 2){ toast("summon at least 2 spirits for a circle"); return; }
   const mode = document.getElementById("modeSelect").value;
+  const semanticNeighbors = document.getElementById("semanticNeighbors").checked;
   const paths = [...selectedPaths];
 
   // Cost-disclaimer for free-for-all with ≥3 personas
@@ -297,7 +357,7 @@ async function summonRoundtable(){
     r = await fetch("/api/summon", {
       method:"POST",
       headers:{"content-type":"application/json"},
-      body: JSON.stringify({paths, mode}),
+      body: JSON.stringify({paths, mode, semantic_neighbors: semanticNeighbors}),
     });
   } finally {
     btn.disabled = false;
@@ -306,15 +366,114 @@ async function summonRoundtable(){
   const j = await r.json();
   sid = j.session_id;
   ritualFlash();
-  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> the circle — ${paths.length} spirits · ${mode}`;
+  const semanticLabel = semanticNeighbors ? " · semantic archive" : "";
+  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> the circle — ${paths.length} spirits · ${mode}${semanticLabel}`;
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
+  document.getElementById("traceBtn").disabled = false;
   document.getElementById("exportBtn").disabled = false;
   // Clear selection
   selectedPaths.clear();
-  document.querySelectorAll(".pageItem.selected").forEach(el => el.classList.remove("selected"));
+  syncSelectionDom();
   updateModeRow();
+}
+
+document.getElementById("ragForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById("ragQuery");
+  const query = input.value.trim();
+  if (!query){ toast("speak a question first"); return; }
+  const btn = document.getElementById("ragSeek");
+  const results = document.getElementById("ragResults");
+  btn.disabled = true;
+  results.classList.add("visible");
+  results.innerHTML = '<div class="listHint">listening through the vault…</div>';
+  try {
+    const r = await fetch("/api/summon-candidates", {
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({query, limit:8}),
+    });
+    const j = await r.json();
+    if (!r.ok){ toast("the vault would not answer: " + r.status); results.innerHTML = ""; return; }
+    renderRagCandidates(j.candidates || []);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+function renderRagCandidates(candidates){
+  const results = document.getElementById("ragResults");
+  results.classList.add("visible");
+  results.innerHTML = "";
+  if (candidates.length === 0){
+    results.innerHTML = '<div class="listHint">no spirits surfaced</div>';
+    return;
+  }
+  candidates.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "ragItem";
+    d.dataset.path = c.path;
+    const score = typeof c.score === "number" ? c.score.toFixed(2) : "?";
+    d.innerHTML = `<div class="ragPath">${escapeHtml(c.path)}</div><div class="ragMeta">${escapeHtml(c.reason || "semantic match")} · ${score}</div>`;
+    d.onclick = () => togglePageSelection(c.path, d);
+    d.ondblclick = () => singleSummonOnDoubleClick(c.path);
+    results.appendChild(d);
+  });
+  syncSelectionDom();
+}
+
+document.getElementById("ragCircles").onclick = async () => {
+  const input = document.getElementById("ragQuery");
+  const query = input.value.trim();
+  if (!query){ toast("speak a question first"); return; }
+  const btn = document.getElementById("ragCircles");
+  const results = document.getElementById("ragResults");
+  btn.disabled = true;
+  results.classList.add("visible");
+  results.innerHTML = '<div class="listHint">drawing circles through the vault…</div>';
+  try {
+    const r = await fetch("/api/constellations", {
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({query, limit:3, size:3}),
+    });
+    const j = await r.json();
+    if (!r.ok){ toast("the vault would not draw circles: " + r.status); results.innerHTML = ""; return; }
+    renderConstellations(j.constellations || []);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+function selectConstellation(paths){
+  if (paths.length > 8){ toast("the circle holds at most 8 spirits"); return; }
+  selectedPaths = new Set(paths);
+  syncSelectionDom();
+  updateModeRow();
+}
+
+function renderConstellations(constellations){
+  const results = document.getElementById("ragResults");
+  results.classList.add("visible");
+  results.innerHTML = "";
+  if (constellations.length === 0){
+    results.innerHTML = '<div class="listHint">no circles formed</div>';
+    return;
+  }
+  constellations.forEach(c => {
+    const paths = Array.isArray(c.paths) ? c.paths : [];
+    const d = document.createElement("div");
+    d.className = "constellationItem";
+    d.dataset.paths = JSON.stringify(paths);
+    const titles = Array.isArray(c.titles) && c.titles.length ? c.titles.join(" · ") : paths.join(" · ");
+    d.innerHTML = `<div class="ragPath">${escapeHtml(c.label || "circle")}</div><div class="ragMeta">${escapeHtml(c.reason || "constellation")} · ${escapeHtml(titles)}</div>`;
+    d.onclick = () => selectConstellation(paths);
+    d.ondblclick = () => { selectConstellation(paths); summonRoundtable(); };
+    results.appendChild(d);
+  });
+  syncSelectionDom();
 }
 
 async function loadSessions(){
@@ -366,6 +525,7 @@ async function loadSessionIntoChat(sessionId, pagePath){
   });
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
+  document.getElementById("traceBtn").disabled = false;
   document.getElementById("exportBtn").disabled = false;
 }
 
@@ -387,8 +547,45 @@ async function summon(path){
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
+  document.getElementById("traceBtn").disabled = false;
   document.getElementById("exportBtn").disabled = false;
   document.getElementById("txt").focus();
+}
+
+async function traceBeliefs(){
+  if (sid === null) return;
+  const btn = document.getElementById("traceBtn");
+  btn.disabled = true; btn.textContent = "tracing…";
+  try {
+    const r = await fetch(`/api/sessions/${sid}/belief-evolution`);
+    if (!r.ok) { toast("the trace would not form"); return; }
+    const trace = await r.json();
+    appendTraceBubble(trace);
+  } finally {
+    btn.disabled = false; btn.textContent = "trace";
+  }
+}
+
+function appendTraceBubble(trace){
+  const log = document.getElementById("log");
+  const d = document.createElement("div");
+  d.className = "msg assistant";
+  const lines = [];
+  lines.push("Belief Evolution");
+  lines.push(`${trace.participants.length} participants · ${trace.turn_count} user turns · ${trace.mode}`);
+  (trace.persona_arcs || []).forEach(arc => {
+    const name = (arc.persona_path || "").split("/").pop().replace(/\.md$/, "");
+    lines.push(``);
+    lines.push(`${name} (${arc.response_count}):`);
+    lines.push(`first: ${arc.first_stance || "(none)"}`);
+    lines.push(`latest: ${arc.latest_stance || "(none)"}`);
+  });
+  const block = document.createElement("div");
+  block.className = "traceBlock";
+  block.textContent = lines.join("\n");
+  d.appendChild(block);
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
 }
 
 async function exportSession(){
@@ -428,7 +625,7 @@ document.getElementById("form").onsubmit = async (ev) => {
   if (Array.isArray(j.replies)){
     j.replies.forEach(rep => appendPersonaBubble(rep));
   } else {
-    appendMsg("assistant", j.reply || "(no reply)");
+    appendAssistantBubble({text:j.reply || "(no reply)", evidence:j.evidence});
   }
 };
 
@@ -451,8 +648,45 @@ function appendPersonaBubble(rep){
   textEl.textContent = rep.text || "";
   d.appendChild(labelEl);
   d.appendChild(textEl);
+  appendEvidenceVeil(d, rep.evidence);
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
+}
+
+function appendAssistantBubble(rep){
+  const log = document.getElementById("log");
+  const d = document.createElement("div");
+  d.className = "msg assistant";
+  const textEl = document.createElement("div");
+  textEl.textContent = rep.text || "";
+  d.appendChild(textEl);
+  appendEvidenceVeil(d, rep.evidence);
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function appendEvidenceVeil(container, evidence){
+  if (!evidence) return;
+  const details = document.createElement("details");
+  details.className = "evidenceVeil";
+  const summary = document.createElement("summary");
+  summary.textContent = "sources used";
+  details.appendChild(summary);
+  const own = document.createElement("div");
+  own.textContent = `own page: ${evidence.own_page || evidence.persona_path || "?"}`;
+  details.appendChild(own);
+  const consulted = Array.isArray(evidence.consulted_paths) ? evidence.consulted_paths : [];
+  const c = document.createElement("div");
+  c.textContent = consulted.length ? `consulted: ${consulted.join(", ")}` : "consulted: none";
+  details.appendChild(c);
+  const semantic = Array.isArray(evidence.semantic_paths) ? evidence.semantic_paths : [];
+  const s = document.createElement("div");
+  s.textContent = semantic.length ? `semantic archive: ${semantic.join(", ")}` : "semantic archive: off";
+  details.appendChild(s);
+  const routing = document.createElement("div");
+  routing.textContent = `routing: ${evidence.routing || evidence.mode || "unknown"}`;
+  details.appendChild(routing);
+  container.appendChild(details);
 }
 
 function appendToolEvent(ev, idx, total){

@@ -18,6 +18,9 @@ from living_vault.core import db as db_mod
 from living_vault.apps.seance_ui.llm import get_llm  # noqa: F401 — re-exported for monkeypatching
 from living_vault.apps.seance_ui import store
 from living_vault.apps.seance_ui import orchestrator
+from living_vault.apps.seance_ui import rag_summon
+from living_vault.apps.seance_ui import constellations
+from living_vault.apps.seance_ui import belief_evolution
 
 # Re-export the constants and _cap_history so existing tests that import them
 # from this module continue to work after the orchestrator extraction.
@@ -59,11 +62,23 @@ class SummonReq(BaseModel):
     # Phase-10b multi-path shape:
     paths: list[str] | None = None
     mode: str = "single"
+    semantic_neighbors: bool = False
 
 
 class SayReq(BaseModel):
     session_id: int
     text: str
+
+
+class SummonCandidatesReq(BaseModel):
+    query: str
+    limit: int = rag_summon.MAX_RAG_SUMMON_CANDIDATES
+
+
+class ConstellationsReq(BaseModel):
+    query: str
+    limit: int = constellations.MAX_CONSTELLATIONS
+    size: int = 3
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,6 +98,31 @@ def list_pages() -> list[dict]:
         con.close()
 
 
+@app.post("/api/summon-candidates")
+def summon_candidates(req: SummonCandidatesReq) -> dict:
+    try:
+        return rag_summon.suggest_personas(
+            _db_path(),
+            req.query,
+            limit=req.limit,
+        )
+    except rag_summon.RAGSummonError as e:
+        raise HTTPException(e.code, e.detail) from e
+
+
+@app.post("/api/constellations")
+def constellation_candidates(req: ConstellationsReq) -> dict:
+    try:
+        return constellations.suggest_constellations(
+            _db_path(),
+            req.query,
+            limit=req.limit,
+            size=req.size,
+        )
+    except rag_summon.RAGSummonError as e:
+        raise HTTPException(e.code, e.detail) from e
+
+
 @app.post("/api/summon")
 def summon(req: SummonReq) -> dict:
     paths = req.paths if req.paths is not None else ([req.path] if req.path else None)
@@ -90,7 +130,11 @@ def summon(req: SummonReq) -> dict:
         raise HTTPException(400, "must provide 'path' or 'paths'")
     try:
         return orchestrator.summon_session(
-            _db_path(), _vault_root(), page_paths=paths, mode=req.mode,
+            _db_path(),
+            _vault_root(),
+            page_paths=paths,
+            mode=req.mode,
+            semantic_neighbors=req.semantic_neighbors,
         )
     except orchestrator.SéanceError as e:
         raise HTTPException(e.code, e.detail) from e
@@ -117,6 +161,14 @@ def get_session_endpoint(session_id: int) -> dict:
     if detail is None:
         raise HTTPException(status_code=404, detail=f"session {session_id} not found")
     return detail
+
+
+@app.get("/api/sessions/{session_id}/belief-evolution")
+def belief_evolution_endpoint(session_id: int) -> dict:
+    trace = belief_evolution.summarize_belief_evolution(_db_path(), session_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail=f"session {session_id} not found")
+    return trace
 
 
 def _slugify(s: str) -> str:

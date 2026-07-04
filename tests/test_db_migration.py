@@ -150,11 +150,13 @@ def test_initialize_adds_mode_to_legacy_seance_sessions(tmp_path: Path):
     con = sqlite3.connect(str(db_path))
     cols = {r[1] for r in con.execute("PRAGMA table_info(seance_sessions)")}
     assert "mode" in cols
+    assert "semantic_neighbors" in cols
     row = con.execute(
-        "SELECT page_path, mode FROM seance_sessions WHERE id = 1"
+        "SELECT page_path, mode, semantic_neighbors FROM seance_sessions WHERE id = 1"
     ).fetchone()
     assert row[0] == "legacy/page.md"
     assert row[1] == "single"
+    assert row[2] == 0
     con.close()
 
 
@@ -191,6 +193,7 @@ def test_phase_10b_migrations_idempotent(tmp_path: Path):
     con = sqlite3.connect(str(db_path))
     cols = {r[1] for r in con.execute("PRAGMA table_info(seance_sessions)")}
     assert "mode" in cols
+    assert "semantic_neighbors" in cols
     tables = {r[0] for r in con.execute(
         "SELECT name FROM sqlite_master WHERE type='table'"
     )}
