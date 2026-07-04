@@ -31,6 +31,40 @@ function Ensure-Command {
     }
 }
 
+function Get-IndexedPageCount {
+    if (-not (Test-Path -LiteralPath $VaultDb)) {
+        return 0
+    }
+
+    $code = @"
+import sqlite3
+from pathlib import Path
+
+db = Path(r"$VaultDb")
+try:
+    con = sqlite3.connect(db)
+    try:
+        has_pages = con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='pages'"
+        ).fetchone()
+        if not has_pages:
+            print(0)
+        else:
+            print(con.execute("SELECT COUNT(*) FROM pages").fetchone()[0])
+    finally:
+        con.close()
+except Exception:
+    print(0)
+"@
+
+    $output = & (Join-Path $VenvScripts "python.exe") -c $code
+    $count = 0
+    if ([int]::TryParse(($output | Select-Object -Last 1), [ref] $count)) {
+        return $count
+    }
+    return 0
+}
+
 Ensure-Command -Path $SeanceUi -Label "seance-ui"
 Ensure-Command -Path $LivingVault -Label "living-vault"
 Ensure-Command -Path $VaultRoot -Label "Vault root"
@@ -38,14 +72,14 @@ Ensure-Command -Path $VaultRoot -Label "Vault root"
 $env:LIVING_VAULT_ROOT = $VaultRoot
 $env:LIVING_VAULT_DB = $VaultDb
 
+if ((Get-IndexedPageCount) -eq 0) {
+    Write-Host "Indexing vault for Seance UI..."
+    & $LivingVault index --vault $VaultRoot --db $VaultDb --no-embed
+}
+
 if (Test-SeanceRunning) {
     Start-Process $Url
     return
-}
-
-if (-not (Test-Path -LiteralPath $VaultDb)) {
-    Write-Host "Indexing vault for Seance UI..."
-    & $LivingVault index --vault $VaultRoot --db $VaultDb --no-embed
 }
 
 Write-Host "Starting Seance UI at $Url"

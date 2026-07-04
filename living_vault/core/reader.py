@@ -27,9 +27,13 @@ def read_page(file_path: Path, vault_root: Path) -> Page:
     vault_root = vault_root.resolve()
     rel = file_path.relative_to(vault_root).as_posix()
     raw = file_path.read_text(encoding="utf-8")
-    fm = frontmatter.loads(raw)
-    body = fm.content
-    md = dict(fm.metadata)
+    try:
+        fm = frontmatter.loads(raw)
+        body = fm.content
+        md = dict(fm.metadata)
+    except Exception:
+        body = raw
+        md = {}
     is_public = bool(md.get("public", False))
     return Page(
         relpath=rel,

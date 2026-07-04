@@ -25,6 +25,20 @@ def test_read_page_public_flag(fixture_vault_root: Path):
     assert p_unset.is_public is False  # missing key defaults to private
 
 
+def test_read_page_treats_invalid_frontmatter_as_body(tmp_path: Path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    page = vault / "bad-frontmatter.md"
+    page.write_text("---\nsource: > broken\n---\nbody\n", encoding="utf-8")
+
+    parsed = read_page(page, vault)
+
+    assert parsed.relpath == "bad-frontmatter.md"
+    assert parsed.frontmatter == {}
+    assert parsed.body.startswith("---\nsource: > broken")
+    assert parsed.is_public is False
+
+
 def test_content_hash_stable():
     h1 = content_hash("hello world")
     h2 = content_hash("hello world")
