@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -65,6 +65,12 @@
 
     #ragSummon{padding:10px 10px 8px;border-bottom:1px solid var(--rule);
       background:rgba(233,176,103,.035);}
+    .stepLabel{font-family:var(--ritual);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+      color:var(--gild);margin-bottom:7px;}
+    .stepMeta{color:var(--mist);letter-spacing:.1em;text-transform:none;}
+    #ragBack{display:block;margin-top:7px;font-family:var(--mono);font-size:10px;color:var(--candle-soft);
+      cursor:pointer;letter-spacing:.06em;}
+    #ragBack:hover{color:var(--candle);text-decoration:underline;}
     #ragForm{display:flex;gap:7px;}
     #ragQuery{min-width:0;flex:1;background:var(--ash);border:1px solid var(--rule);
       color:var(--bone);border-radius:4px;padding:8px 9px;font-family:var(--mono);font-size:11px;}
@@ -89,50 +95,45 @@
     .constellationItem:hover{background:var(--ash-2);border-color:var(--ecto);}
     .constellationItem.selected{border-color:var(--ecto);background:rgba(143,224,200,.09);}
 
-    #pagePicker{padding:9px 10px;border-bottom:1px solid var(--rule);
-      background:rgba(11,8,9,.22);}
-    #pagePickerRow{display:flex;gap:7px;align-items:center;}
-    #pageSelect{min-width:0;flex:1;background:var(--ash);border:1px solid var(--rule);
-      color:var(--bone);border-radius:4px;padding:8px 9px;font-family:var(--mono);font-size:11px;}
-    #pageSelect:focus{outline:none;border-color:var(--candle);
-      box-shadow:0 0 0 1px rgba(233,176,103,.18);}
-    #pageSummonSelected{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
-      border-radius:4px;padding:8px 10px;font-family:var(--ritual);font-size:10px;
-      letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
-    #pageSummonSelected:hover:not(:disabled){background:rgba(143,224,200,.18);}
-    #pageSummonSelected:disabled{opacity:.4;cursor:not-allowed;}
-    #selectionStatus{margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--mist);
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-
     #list{flex:1;overflow:auto;padding:8px 8px 4px;font-family:var(--mono);font-size:12px;}
     .listHint{opacity:.55;font-size:11px;padding:8px;font-style:italic;font-family:var(--serif);}
     .pageItem{padding:6px 9px;cursor:pointer;border-radius:3px;color:var(--mist);
       border-left:2px solid transparent;transition:background .15s, color .15s, border-color .15s;}
+    .pageItem::before{content:"☐ ";color:var(--mist);}
     .pageItem:hover{background:var(--ash-2);color:var(--bone);}
     .pageItem.selected{background:rgba(143,224,200,.08);color:var(--ecto);
       border-left:2px solid var(--ecto);text-shadow:0 0 10px rgba(143,224,200,.4);}
+    .pageItem.selected::before{content:"☑ ";color:var(--ecto);}
+
+    #chips{padding:8px 10px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:5px;
+      font-family:var(--mono);font-size:10px;max-height:88px;overflow:auto;}
+    .chipsEmpty{color:var(--mist);font-style:italic;font-family:var(--serif);font-size:11px;}
+    .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border:1px solid var(--ecto);
+      border-radius:10px;color:var(--ecto);background:rgba(143,224,200,.07);max-width:100%;}
+    .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .chipX{cursor:pointer;color:var(--mist);font-weight:500;}
+    .chipX:hover{color:var(--oxblood);}
     .sessionItem{padding:9px 11px;cursor:pointer;border-radius:4px;border:1px solid var(--rule);
       margin-bottom:7px;background:rgba(21,16,14,.5);transition:background .15s, border-color .15s;}
     .sessionItem:hover{background:var(--ash-2);border-color:var(--gild);}
     .sessionItem .sName{font-family:var(--mono);font-size:12px;color:var(--bone);}
     .sessionMeta{font-family:var(--mono);font-size:10px;color:var(--mist);margin-top:3px;letter-spacing:.04em;}
 
-    /* mode row — assembling the circle */
-    #modeRow{padding:10px 12px;border-top:1px solid var(--rule);display:none;
-      background:rgba(143,224,200,.04);}
-    #modeRow.visible{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-      font-family:var(--mono);font-size:11px;color:var(--mist);}
-    #modeRow label{letter-spacing:.1em;text-transform:uppercase;font-size:10px;}
-    #modeRow select{background:var(--ash);color:var(--bone);border:1px solid var(--rule);
-      padding:5px 6px;font-family:var(--mono);font-size:11px;border-radius:3px;}
-    #semanticToggle{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
-      color:var(--mist);letter-spacing:.08em;text-transform:uppercase;}
+    /* step 2 + 3 — mode & start */
+    #stepTwo{padding:10px 12px;border-top:1px solid var(--rule);display:flex;flex-direction:column;
+      gap:7px;background:rgba(143,224,200,.04);font-family:var(--mono);font-size:11px;color:var(--mist);}
+    #stepTwo select{background:var(--ash);color:var(--bone);border:1px solid var(--rule);
+      padding:6px 7px;font-family:var(--mono);font-size:11px;border-radius:3px;}
+    #stepTwo select:disabled{opacity:.45;cursor:not-allowed;}
+    #modeHint{font-family:var(--serif);font-style:italic;font-size:12px;color:var(--mist);line-height:1.4;}
+    #semanticToggle{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;
+      color:var(--mist);letter-spacing:.04em;cursor:pointer;}
     #semanticToggle input{accent-color:var(--ecto);}
-    #summonBtn{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
-      padding:7px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:10px;
+    #startBtn{background:rgba(143,224,200,.1);color:var(--ecto);border:1px solid var(--ecto);
+      padding:9px 13px;border-radius:4px;cursor:pointer;font-family:var(--ritual);font-size:11px;
       letter-spacing:.16em;text-transform:uppercase;transition:background .2s, box-shadow .2s;}
-    #summonBtn:hover:not(:disabled){background:rgba(143,224,200,.18);box-shadow:0 0 20px -4px rgba(143,224,200,.5);}
-    #summonBtn:disabled{opacity:.4;cursor:not-allowed;}
+    #startBtn:hover:not(:disabled){background:rgba(143,224,200,.18);box-shadow:0 0 20px -4px rgba(143,224,200,.5);}
+    #startBtn:disabled{opacity:.4;cursor:not-allowed;}
 
     /* ── right: the séance table ── */
     #chat{display:flex;flex-direction:column;padding:16px 20px;min-height:0;min-width:0;}
@@ -146,6 +147,36 @@
       letter-spacing:.16em;text-transform:uppercase;transition:background .2s, color .2s;}
     #exportBtn:hover:not(:disabled),#traceBtn:hover:not(:disabled){background:var(--gild);color:var(--void);}
     #exportBtn:disabled,#traceBtn:disabled{opacity:.35;cursor:not-allowed;}
+    #helpBtn{background:transparent;color:var(--gild);border:1px solid var(--gild);
+      width:28px;height:28px;border-radius:50%;cursor:pointer;font-family:var(--ritual);
+      font-size:12px;transition:background .2s, color .2s;}
+    #helpBtn:hover{background:var(--gild);color:var(--void);}
+
+    /* starter card — the built-in quick guide in the empty log */
+    #starterCard{margin:26px auto;max-width:52ch;padding:18px 22px;border:1px solid var(--rule);
+      border-radius:8px;background:rgba(21,16,14,.55);color:var(--bone);}
+    .starterTitle{font-family:var(--ritual);font-size:13px;letter-spacing:.2em;text-transform:uppercase;
+      color:var(--candle);margin-bottom:10px;}
+    #starterCard ol{margin:0 0 10px;padding-left:1.3em;font-size:15px;line-height:1.7;}
+    .starterNote{font-style:italic;color:var(--mist);font-size:14px;line-height:1.5;}
+
+    /* help overlay */
+    #helpOverlay{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+      background:rgba(11,8,9,.75);}
+    #helpOverlay.open{display:flex;}
+    #helpPanel{position:relative;max-width:62ch;max-height:82vh;overflow:auto;margin:20px;
+      padding:22px 26px;background:var(--ash);border:1px solid var(--gild);border-radius:8px;
+      box-shadow:0 0 40px -10px rgba(201,162,75,.4);font-size:15px;line-height:1.6;}
+    #helpPanel h2{font-family:var(--ritual);font-size:14px;letter-spacing:.2em;text-transform:uppercase;
+      color:var(--candle);margin:0 0 12px;}
+    #helpPanel h3{font-family:var(--ritual);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+      color:var(--gild);margin:16px 0 6px;}
+    #helpPanel ol,#helpPanel ul{margin:0;padding-left:1.3em;}
+    #helpPanel li{margin:3px 0;}
+    #helpPanel .helpNote{color:var(--mist);font-style:italic;margin-top:14px;font-size:13px;}
+    #helpClose{position:absolute;top:10px;right:12px;background:transparent;border:none;
+      color:var(--mist);font-size:20px;cursor:pointer;line-height:1;padding:4px;}
+    #helpClose:hover{color:var(--oxblood);}
 
     #log{flex:1;overflow:auto;font-size:17px;line-height:1.62;padding-right:6px;}
 
@@ -231,55 +262,91 @@
   <div id="side">
     <div id="brandmark">
       <div class="mark">✦ séance</div>
-      <div class="sub">commune with the pages of the vault</div>
+      <div class="sub">Sprich mit den Seiten deines Vaults</div>
     </div>
     <div id="tabs">
-      <div class="tab active" data-tab="pages" onclick="switchTab('pages')">spirits</div>
-      <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">records</div>
+      <div class="tab active" data-tab="pages" onclick="switchTab('pages')">Seiten</div>
+      <div class="tab" data-tab="sessions" onclick="switchTab('sessions')">Verlauf</div>
     </div>
     <div id="ragSummon">
+      <div class="stepLabel">① Seiten auswählen <span class="stepMeta">(1–8)</span></div>
       <form id="ragForm">
-        <input id="ragQuery" autocomplete="off" maxlength="1000" placeholder="ask which spirits should gather…" />
-        <button id="ragSeek" type="submit">seek</button>
-        <button id="ragCircles" type="button">circles</button>
+        <input id="ragQuery" autocomplete="off" maxlength="1000" placeholder="Suchen oder Thema eingeben…" />
+        <button id="ragSeek" type="submit">KI fragen</button>
+        <button id="ragCircles" type="button">Gruppen</button>
       </form>
       <div id="ragResults"></div>
     </div>
-    <div id="pagePicker">
-      <div id="pagePickerRow">
-        <select id="pageSelect" disabled>
-          <option value="">loading spirits…</option>
-        </select>
-        <button id="pageSummonSelected" type="button" disabled>summon</button>
-      </div>
-      <div id="selectionStatus">no spirit selected</div>
-    </div>
-    <div id="list"><div class="listHint">the register stirs…</div></div>
-    <div id="modeRow">
-      <label>circle:</label>
-      <select id="modeSelect">
-        <option value="roundrobin">round-robin</option>
-        <option value="moderator">moderator (@-mention)</option>
-        <option value="auto">auto-moderator</option>
-        <option value="freeforall">free-for-all</option>
+    <div id="list"><div class="listHint">Seiten werden geladen…</div></div>
+    <div id="chips"><span class="chipsEmpty">Noch keine Seite ausgewählt</span></div>
+    <div id="stepTwo">
+      <div class="stepLabel">② Gesprächsmodus</div>
+      <select id="modeSelect" disabled>
+        <option value="roundrobin">Reihum</option>
+        <option value="moderator">Moderiert (@Name)</option>
+        <option value="auto">Auto-Moderator</option>
+        <option value="freeforall">Alle gleichzeitig</option>
       </select>
-      <label id="semanticToggle"><input id="semanticNeighbors" type="checkbox" /> semantic archive</label>
-      <button id="summonBtn" onclick="summonRoundtable()">summon the circle</button>
+      <div id="modeHint">Einzelgespräch — wähle 2+ Seiten für eine Gesprächsrunde.</div>
+      <label id="semanticToggle"><input id="semanticNeighbors" type="checkbox" /> Verwandte Seiten als Wissen einbeziehen</label>
+      <button id="startBtn" onclick="startConversation()" disabled>▶ Gespräch starten</button>
     </div>
   </div>
   <div id="chat">
     <div id="header">
-      <div id="who">the circle is empty — choose a spirit</div>
+      <div id="who">Kein Gespräch aktiv — wähle links Seiten aus</div>
       <div id="headerActions">
-        <button id="traceBtn" disabled onclick="traceBeliefs()">trace</button>
-        <button id="exportBtn" disabled onclick="exportSession()">seal record</button>
+        <button id="helpBtn" onclick="openHelp()" aria-label="Hilfe">?</button>
+        <button id="traceBtn" disabled onclick="traceBeliefs()">Meinungsverlauf</button>
+        <button id="exportBtn" disabled onclick="exportSession()">Exportieren</button>
       </div>
     </div>
-    <div id="log"></div>
-    <form id="form"><input id="txt" autocomplete="off" placeholder="speak into the dark…" disabled /><button id="send" disabled>ask</button></form>
+    <div id="log">
+      <div id="starterCard">
+        <div class="starterTitle">So funktioniert séance</div>
+        <ol>
+          <li>Wähle links eine oder mehrere Seiten aus (per Suche, Liste oder „KI fragen").</li>
+          <li>Klicke auf „▶ Gespräch starten".</li>
+          <li>Stell unten deine Frage.</li>
+        </ol>
+        <div class="starterNote">Jede Seite antwortet aus ihrer eigenen Sicht — gestützt auf ihren Inhalt und ihre Verlinkungen.</div>
+      </div>
+    </div>
+    <form id="form"><input id="txt" autocomplete="off" placeholder="Stell deine Frage…" disabled /><button id="send" disabled>Senden</button></form>
   </div>
 </div>
 <div id="toast"></div>
+<div id="helpOverlay" onclick="if(event.target===this)closeHelp()">
+  <div id="helpPanel" role="dialog" aria-label="Anleitung">
+    <button id="helpClose" onclick="closeHelp()" aria-label="Schließen">×</button>
+    <h2>Anleitung</h2>
+    <ol>
+      <li>Wähle links unter <b>① Seiten auswählen</b> eine oder mehrere Seiten (max. 8).</li>
+      <li>Wähle ab 2 Seiten unter <b>② Gesprächsmodus</b>, wie geantwortet wird.</li>
+      <li>Klicke auf <b>③ ▶ Gespräch starten</b> und stell unten deine Frage.</li>
+    </ol>
+    <h3>Seiten finden</h3>
+    <ul>
+      <li><b>Tippen</b> im Suchfeld filtert die Seitenliste sofort.</li>
+      <li><b>„KI fragen"</b> schlägt zu einem Thema inhaltlich passende Seiten vor.</li>
+      <li><b>„Gruppen"</b> liefert fertige 3er-Kombinationen zusammengehöriger Seiten.</li>
+    </ul>
+    <h3>Die vier Modi</h3>
+    <ul>
+      <li><b>Reihum:</b> Jede Seite antwortet nacheinander in fester Reihenfolge.</li>
+      <li><b>Moderiert (@Name):</b> Nur die Seite antwortet, die du mit @Name ansprichst.</li>
+      <li><b>Auto-Moderator:</b> Die passendste Seite antwortet automatisch.</li>
+      <li><b>Alle gleichzeitig:</b> Alle Seiten antworten auf jede Frage (teuerste Variante).</li>
+    </ul>
+    <h3>Während des Gesprächs</h3>
+    <ul>
+      <li><b>„Meinungsverlauf"</b> fasst zusammen, wie sich die Positionen der Seiten entwickelt haben.</li>
+      <li><b>„Exportieren"</b> speichert das Gespräch als Datei.</li>
+      <li>Der Tab <b>„Verlauf"</b> öffnet frühere Gespräche.</li>
+    </ul>
+    <div class="helpNote">Maximal 8 Seiten pro Gespräch. Jede Seite antwortet aus ihrer eigenen Sicht — gestützt auf ihren Inhalt und ihre Verlinkungen.</div>
+  </div>
+</div>
 <script>
 let sid = null;
 let currentTab = "pages";
@@ -295,9 +362,11 @@ function ritualFlash(){
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
-  document.getElementById("ragSummon").style.display = name === "pages" ? "block" : "none";
-  document.getElementById("pagePicker").style.display = name === "pages" ? "block" : "none";
-  if (name === "pages") loadPages();
+  const onPages = name === "pages";
+  document.getElementById("ragSummon").style.display = onPages ? "block" : "none";
+  document.getElementById("chips").style.display = onPages ? "flex" : "none";
+  document.getElementById("stepTwo").style.display = onPages ? "flex" : "none";
+  if (onPages) loadPages();
   else loadSessions();
 }
 
@@ -306,89 +375,59 @@ let selectedPaths = new Set();
 async function loadPages(){
   const r = await fetch("/api/pages"); const j = await r.json();
   pagesCache = Array.isArray(j) ? j : [];
-  renderPageDropdown();
+  renderPageList(pagesCache);
+  updateSelectionControls();
+}
+
+function renderPageList(pages){
   const el = document.getElementById("list"); el.innerHTML = "";
-  pagesCache.forEach(p => {
+  if (pages.length === 0){
+    el.innerHTML = '<div class="listHint">Keine Seiten gefunden.</div>';
+    return;
+  }
+  pages.forEach(p => {
     const d = document.createElement("div"); d.className="pageItem";
     d.textContent = p.path;
     d.dataset.path = p.path;
-    // Reapply visual selection state — the Set survives loadPages re-renders,
-    // but the DOM is wiped, so without this we'd silently lose the .selected
-    // class on tab-switch-back even though the Set still has the path.
+    // Reapply visual selection state — the Set survives re-renders,
+    // but the DOM is wiped on each render.
     if (selectedPaths.has(p.path)) d.classList.add("selected");
-    // Note: click fires twice before dblclick on a double-click (toggle in,
-    // toggle out), then dblclick clears selection and runs legacy summon —
-    // brief visual flicker is harmless.
     d.onclick = () => togglePageSelection(p.path, d);
-    d.ondblclick = () => singleSummonOnDoubleClick(p.path);
     el.appendChild(d);
   });
-  updateSelectionControls();
 }
 
-function renderPageDropdown(){
-  const select = document.getElementById("pageSelect");
-  select.innerHTML = "";
-  if (pagesCache.length === 0){
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "no spirits indexed";
-    select.appendChild(opt);
-    select.disabled = true;
-    return;
-  }
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "choose a page…";
-  select.appendChild(placeholder);
-  pagesCache.forEach(p => {
-    const opt = document.createElement("option");
-    opt.value = p.path;
-    opt.textContent = p.title ? `${p.title} — ${p.path}` : p.path;
-    select.appendChild(opt);
-  });
-  select.disabled = false;
+function filterPageList(term){
+  const t = term.trim().toLowerCase();
+  if (!t){ renderPageList(pagesCache); return; }
+  renderPageList(pagesCache.filter(p =>
+    p.path.toLowerCase().includes(t) || (p.title || "").toLowerCase().includes(t)));
 }
 
-document.getElementById("pageSelect").onchange = (ev) => {
-  const path = ev.target.value;
-  if (!path) return;
-  addPageSelection(path);
-  ev.target.value = "";
-};
+document.getElementById("ragQuery").addEventListener("input", (ev) => {
+  filterPageList(ev.target.value);
+});
 
-document.getElementById("pageSummonSelected").onclick = () => {
-  const paths = [...selectedPaths];
-  if (paths.length === 0){ toast("choose a spirit first"); return; }
-  if (paths.length === 1){
-    selectedPaths.clear();
-    syncSelectionDom();
-    updateSelectionControls();
-    summon(paths[0]);
-    return;
-  }
-  summonRoundtable();
-};
+function showFullList(){
+  const results = document.getElementById("ragResults");
+  results.classList.remove("visible");
+  results.innerHTML = "";
+  filterPageList(document.getElementById("ragQuery").value);
+}
 
-function addPageSelection(path){
-  if (selectedPaths.has(path)){
-    toast("that spirit is already in the circle");
-    return;
-  }
-  if (selectedPaths.size >= 8){
-    toast("the circle holds at most 8 spirits");
-    return;
-  }
-  selectedPaths.add(path);
-  syncSelectionDom();
-  updateSelectionControls();
+function addRagBackLink(container){
+  const back = document.createElement("div");
+  back.id = "ragBack";
+  back.textContent = "← zurück zur vollen Liste";
+  back.onclick = showFullList;
+  container.appendChild(back);
 }
 
 function togglePageSelection(path, el){
   if (selectedPaths.has(path)){
     selectedPaths.delete(path);
   } else if (selectedPaths.size >= 8){
-    toast("the circle holds at most 8 spirits");
+    toast("Maximal 8 Seiten pro Gespräch");
     return;
   } else {
     selectedPaths.add(path);
@@ -407,52 +446,83 @@ function syncSelectionDom(){
   });
 }
 
-function updateModeRow(){
-  const row = document.getElementById("modeRow");
-  if (selectedPaths.size >= 2){
-    row.classList.add("visible");
+const MODE_HINTS = {
+  roundrobin: {name: "Reihum", hint: "Jede Seite antwortet nacheinander in fester Reihenfolge."},
+  moderator: {name: "Moderiert (@Name)", hint: "Nur die Seite antwortet, die du mit @Name ansprichst."},
+  auto: {name: "Auto-Moderator", hint: "Die passendste Seite antwortet automatisch."},
+  freeforall: {name: "Alle gleichzeitig", hint: "Alle Seiten antworten auf jede Frage (teuerste Variante)."},
+};
+
+document.getElementById("modeSelect").addEventListener("change", updateStepTwo);
+
+function updateStepTwo(){
+  const count = selectedPaths.size;
+  const select = document.getElementById("modeSelect");
+  const hint = document.getElementById("modeHint");
+  select.disabled = count < 2;
+  if (count < 2){
+    hint.textContent = "Einzelgespräch — wähle 2+ Seiten für eine Gesprächsrunde.";
   } else {
-    row.classList.remove("visible");
+    hint.textContent = MODE_HINTS[select.value].hint;
   }
+}
+
+function renderChips(){
+  const el = document.getElementById("chips");
+  el.innerHTML = "";
+  if (selectedPaths.size === 0){
+    el.innerHTML = '<span class="chipsEmpty">Noch keine Seite ausgewählt</span>';
+    return;
+  }
+  [...selectedPaths].forEach(path => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    const name = document.createElement("span");
+    name.textContent = path.split("/").pop().replace(/\.md$/, "");
+    name.title = path;
+    const x = document.createElement("span");
+    x.className = "chipX";
+    x.textContent = "×";
+    x.title = "Entfernen";
+    x.onclick = () => {
+      selectedPaths.delete(path);
+      syncSelectionDom();
+      updateSelectionControls();
+    };
+    chip.appendChild(name);
+    chip.appendChild(x);
+    el.appendChild(chip);
+  });
 }
 
 function updateSelectionControls(){
-  updateModeRow();
-  const count = selectedPaths.size;
-  const btn = document.getElementById("pageSummonSelected");
-  const status = document.getElementById("selectionStatus");
-  btn.disabled = count === 0;
-  btn.textContent = count >= 2 ? "summon circle" : "summon";
-  if (count === 0){
-    status.textContent = "no spirit selected";
+  renderChips();
+  updateStepTwo();
+  document.getElementById("startBtn").disabled = selectedPaths.size === 0;
+}
+
+async function startConversation(){
+  const paths = [...selectedPaths];
+  if (paths.length === 0){ toast("Wähle zuerst mindestens eine Seite aus"); return; }
+  if (paths.length === 1){
+    selectedPaths.clear();
+    syncSelectionDom();
+    updateSelectionControls();
+    summon(paths[0]);
     return;
   }
-  const names = [...selectedPaths].map(path => path.split("/").pop().replace(/\.md$/, ""));
-  status.textContent = `${count} selected: ${names.join(", ")}`;
-}
-
-function singleSummonOnDoubleClick(path){
-  selectedPaths.clear();
-  syncSelectionDom();
-  updateSelectionControls();
-  summon(path);  // legacy single-page summon (Phase-10a path)
-}
-
-async function summonRoundtable(){
-  if (selectedPaths.size < 2){ toast("summon at least 2 spirits for a circle"); return; }
   const mode = document.getElementById("modeSelect").value;
   const semanticNeighbors = document.getElementById("semanticNeighbors").checked;
-  const paths = [...selectedPaths];
 
-  // Cost-disclaimer for free-for-all with ≥3 personas
+  // Kosten-Hinweis für „Alle gleichzeitig" mit ≥3 Seiten
   if (mode === "freeforall" && paths.length >= 3){
-    const ok = confirm(`Free-for-all with ${paths.length} personas: ~${paths.length}× token cost per turn. Continue?`);
+    const ok = confirm(`Alle gleichzeitig mit ${paths.length} Seiten: ca. ${paths.length}-fache Token-Kosten pro Frage. Fortfahren?`);
     if (!ok) return;
   }
 
-  // Disable the summon button during the in-flight request to prevent
+  // Disable the start button during the in-flight request to prevent
   // accidental duplicate submissions on a rapid double-click.
-  const btn = document.getElementById("summonBtn");
+  const btn = document.getElementById("startBtn");
   btn.disabled = true;
   let r;
   try {
@@ -464,17 +534,20 @@ async function summonRoundtable(){
   } finally {
     btn.disabled = false;
   }
-  if (!r.ok){ toast("the circle would not form: " + r.status); return; }
+  if (!r.ok){ toast("Gespräch konnte nicht gestartet werden (HTTP " + r.status + ")"); return; }
   const j = await r.json();
   sid = j.session_id;
   ritualFlash();
-  const semanticLabel = semanticNeighbors ? " · semantic archive" : "";
-  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> the circle — ${paths.length} spirits · ${mode}${semanticLabel}`;
+  clearStarterCard();
+  const semanticLabel = semanticNeighbors ? " · verwandte Seiten" : "";
+  const modeName = MODE_HINTS[mode].name;
+  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> Gespräch mit ${paths.length} Seiten · ${modeName}${semanticLabel}`;
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
   document.getElementById("traceBtn").disabled = false;
   document.getElementById("exportBtn").disabled = false;
+  document.getElementById("txt").focus();
   // Clear selection
   selectedPaths.clear();
   syncSelectionDom();
@@ -485,12 +558,12 @@ document.getElementById("ragForm").onsubmit = async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("ragQuery");
   const query = input.value.trim();
-  if (!query){ toast("speak a question first"); return; }
+  if (!query){ toast("Gib zuerst einen Suchbegriff ein"); return; }
   const btn = document.getElementById("ragSeek");
   const results = document.getElementById("ragResults");
   btn.disabled = true;
   results.classList.add("visible");
-  results.innerHTML = '<div class="listHint">listening through the vault…</div>';
+  results.innerHTML = '<div class="listHint">Der Vault wird durchsucht…</div>';
   try {
     const r = await fetch("/api/summon-candidates", {
       method:"POST",
@@ -498,7 +571,7 @@ document.getElementById("ragForm").onsubmit = async (ev) => {
       body:JSON.stringify({query, limit:8}),
     });
     const j = await r.json();
-    if (!r.ok){ toast("the vault would not answer: " + r.status); results.innerHTML = ""; return; }
+    if (!r.ok){ toast("Suche fehlgeschlagen (HTTP " + r.status + ")"); results.innerHTML = ""; return; }
     renderRagCandidates(j.candidates || []);
   } finally {
     btn.disabled = false;
@@ -510,7 +583,8 @@ function renderRagCandidates(candidates){
   results.classList.add("visible");
   results.innerHTML = "";
   if (candidates.length === 0){
-    results.innerHTML = '<div class="listHint">no spirits surfaced</div>';
+    results.innerHTML = '<div class="listHint">Keine passenden Seiten gefunden</div>';
+    addRagBackLink(results);
     return;
   }
   candidates.forEach(c => {
@@ -518,23 +592,23 @@ function renderRagCandidates(candidates){
     d.className = "ragItem";
     d.dataset.path = c.path;
     const score = typeof c.score === "number" ? c.score.toFixed(2) : "?";
-    d.innerHTML = `<div class="ragPath">${escapeHtml(c.path)}</div><div class="ragMeta">${escapeHtml(c.reason || "semantic match")} · ${score}</div>`;
+    d.innerHTML = `<div class="ragPath">${escapeHtml(c.path)}</div><div class="ragMeta">${escapeHtml(c.reason || "inhaltlich passend")} · ${score}</div>`;
     d.onclick = () => togglePageSelection(c.path, d);
-    d.ondblclick = () => singleSummonOnDoubleClick(c.path);
     results.appendChild(d);
   });
+  addRagBackLink(results);
   syncSelectionDom();
 }
 
 document.getElementById("ragCircles").onclick = async () => {
   const input = document.getElementById("ragQuery");
   const query = input.value.trim();
-  if (!query){ toast("speak a question first"); return; }
+  if (!query){ toast("Gib zuerst einen Suchbegriff ein"); return; }
   const btn = document.getElementById("ragCircles");
   const results = document.getElementById("ragResults");
   btn.disabled = true;
   results.classList.add("visible");
-  results.innerHTML = '<div class="listHint">drawing circles through the vault…</div>';
+  results.innerHTML = '<div class="listHint">Gruppen werden zusammengestellt…</div>';
   try {
     const r = await fetch("/api/constellations", {
       method:"POST",
@@ -542,7 +616,7 @@ document.getElementById("ragCircles").onclick = async () => {
       body:JSON.stringify({query, limit:3, size:3}),
     });
     const j = await r.json();
-    if (!r.ok){ toast("the vault would not draw circles: " + r.status); results.innerHTML = ""; return; }
+    if (!r.ok){ toast("Gruppen-Suche fehlgeschlagen (HTTP " + r.status + ")"); results.innerHTML = ""; return; }
     renderConstellations(j.constellations || []);
   } finally {
     btn.disabled = false;
@@ -550,7 +624,7 @@ document.getElementById("ragCircles").onclick = async () => {
 };
 
 function selectConstellation(paths){
-  if (paths.length > 8){ toast("the circle holds at most 8 spirits"); return; }
+  if (paths.length > 8){ toast("Maximal 8 Seiten pro Gespräch"); return; }
   selectedPaths = new Set(paths);
   syncSelectionDom();
   updateSelectionControls();
@@ -561,7 +635,8 @@ function renderConstellations(constellations){
   results.classList.add("visible");
   results.innerHTML = "";
   if (constellations.length === 0){
-    results.innerHTML = '<div class="listHint">no circles formed</div>';
+    results.innerHTML = '<div class="listHint">Keine Gruppen gefunden</div>';
+    addRagBackLink(results);
     return;
   }
   constellations.forEach(c => {
@@ -570,11 +645,11 @@ function renderConstellations(constellations){
     d.className = "constellationItem";
     d.dataset.paths = JSON.stringify(paths);
     const titles = Array.isArray(c.titles) && c.titles.length ? c.titles.join(" · ") : paths.join(" · ");
-    d.innerHTML = `<div class="ragPath">${escapeHtml(c.label || "circle")}</div><div class="ragMeta">${escapeHtml(c.reason || "constellation")} · ${escapeHtml(titles)}</div>`;
+    d.innerHTML = `<div class="ragPath">${escapeHtml(c.label || "Gruppe")}</div><div class="ragMeta">${escapeHtml(c.reason || "zusammengehörig")} · ${escapeHtml(titles)}</div>`;
     d.onclick = () => selectConstellation(paths);
-    d.ondblclick = () => { selectConstellation(paths); summonRoundtable(); };
     results.appendChild(d);
   });
+  addRagBackLink(results);
   syncSelectionDom();
 }
 
@@ -582,13 +657,13 @@ async function loadSessions(){
   const r = await fetch("/api/sessions"); const j = await r.json();
   const el = document.getElementById("list"); el.innerHTML = "";
   if (j.length === 0) {
-    el.innerHTML = '<div class="listHint">no séances recorded — summon a spirit to begin</div>';
+    el.innerHTML = '<div class="listHint">Noch keine Gespräche gespeichert — starte links dein erstes.</div>';
     return;
   }
   j.forEach(s => {
     const d = document.createElement("div"); d.className="sessionItem";
     const date = (s.started_at || "").substring(0, 16).replace("T", " ");
-    d.innerHTML = `<div class="sName">${s.page_path}</div><div class="sessionMeta">${date} · ${s.message_count} msgs</div>`;
+    d.innerHTML = `<div class="sName">${s.page_path}</div><div class="sessionMeta">${date} · ${s.message_count} Nachrichten</div>`;
     d.onclick = () => loadSessionIntoChat(s.id, s.page_path);
     el.appendChild(d);
   });
@@ -596,11 +671,12 @@ async function loadSessions(){
 
 async function loadSessionIntoChat(sessionId, pagePath){
   const r = await fetch(`/api/sessions/${sessionId}`);
-  if (!r.ok) { toast("the record would not open"); return; }
+  if (!r.ok) { toast("Gespräch konnte nicht geladen werden"); return; }
   const j = await r.json();
   sid = sessionId;
   ritualFlash();
-  document.getElementById("who").textContent = "record · " + pagePath;
+  clearStarterCard();
+  document.getElementById("who").textContent = "Verlauf · " + pagePath;
   document.getElementById("log").innerHTML = "";
   j.messages.forEach(m => {
     if (m.role === "tool_use"){
@@ -612,7 +688,7 @@ async function loadSessionIntoChat(sessionId, pagePath){
           tool_result_summary: payload.tool_result_summary,
         }, 0, 1);
       } catch(e) {
-        appendMsg("assistant", "(unreadable tool event)");
+        appendMsg("assistant", "(nicht lesbares Tool-Ereignis)");
       }
     } else if (m.role === "assistant" && m.persona_path){
       // Phase-10b: render roundtable assistant rows with persona label
@@ -641,11 +717,12 @@ function hashColorJs(path){
 
 async function summon(path){
   const r = await fetch("/api/summon",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path})});
-  if(!r.ok){ toast("the spirit would not answer: " + path); return; }
+  if(!r.ok){ toast("Seite konnte nicht geladen werden: " + path); return; }
   const j = await r.json(); sid = j.session_id;
   ritualFlash();
+  clearStarterCard();
   const name = path.split("/").pop().replace(/\.md$/, "");
-  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> communing with <b>${escapeHtml(name)}</b> · era ${escapeHtml(j.persona.era_marker||"unknown")}`;
+  document.getElementById("who").innerHTML = `<span class="liveDot">✦</span> Gespräch mit <b>${escapeHtml(name)}</b> · Ära ${escapeHtml(j.persona.era_marker||"unbekannt")}`;
   document.getElementById("log").innerHTML = "";
   document.getElementById("txt").disabled = false;
   document.getElementById("send").disabled = false;
@@ -657,14 +734,14 @@ async function summon(path){
 async function traceBeliefs(){
   if (sid === null) return;
   const btn = document.getElementById("traceBtn");
-  btn.disabled = true; btn.textContent = "tracing…";
+  btn.disabled = true; btn.textContent = "wird erstellt…";
   try {
     const r = await fetch(`/api/sessions/${sid}/belief-evolution`);
-    if (!r.ok) { toast("the trace would not form"); return; }
+    if (!r.ok) { toast("Meinungsverlauf konnte nicht erstellt werden"); return; }
     const trace = await r.json();
     appendTraceBubble(trace);
   } finally {
-    btn.disabled = false; btn.textContent = "trace";
+    btn.disabled = false; btn.textContent = "Meinungsverlauf";
   }
 }
 
@@ -673,14 +750,15 @@ function appendTraceBubble(trace){
   const d = document.createElement("div");
   d.className = "msg assistant";
   const lines = [];
-  lines.push("Belief Evolution");
-  lines.push(`${trace.participants.length} participants · ${trace.turn_count} user turns · ${trace.mode}`);
+  lines.push("Meinungsverlauf");
+  const modeName = (MODE_HINTS[trace.mode] || {}).name || trace.mode;
+  lines.push(`${trace.participants.length} Teilnehmer · ${trace.turn_count} Fragen · ${modeName}`);
   (trace.persona_arcs || []).forEach(arc => {
     const name = (arc.persona_path || "").split("/").pop().replace(/\.md$/, "");
     lines.push(``);
     lines.push(`${name} (${arc.response_count}):`);
-    lines.push(`first: ${arc.first_stance || "(none)"}`);
-    lines.push(`latest: ${arc.latest_stance || "(none)"}`);
+    lines.push(`zu Beginn: ${arc.first_stance || "(keine Angabe)"}`);
+    lines.push(`zuletzt: ${arc.latest_stance || "(keine Angabe)"}`);
   });
   const block = document.createElement("div");
   block.className = "traceBlock";
@@ -693,16 +771,33 @@ function appendTraceBubble(trace){
 async function exportSession(){
   if (sid === null) return;
   const btn = document.getElementById("exportBtn");
-  btn.disabled = true; btn.textContent = "sealing…";
+  btn.disabled = true; btn.textContent = "wird exportiert…";
   try {
     const r = await fetch(`/api/sessions/${sid}/export`, {method: "POST"});
-    if (!r.ok) { toast("the seal would not hold"); return; }
+    if (!r.ok) { toast("Export fehlgeschlagen"); return; }
     const j = await r.json();
-    toast("sealed into: " + j.exported_to);
+    toast("Exportiert nach: " + j.exported_to);
   } finally {
-    btn.disabled = false; btn.textContent = "seal record";
+    btn.disabled = false; btn.textContent = "Exportieren";
   }
 }
+
+function clearStarterCard(){
+  const card = document.getElementById("starterCard");
+  if (card) card.remove();
+}
+
+function openHelp(){
+  document.getElementById("helpOverlay").classList.add("open");
+}
+
+function closeHelp(){
+  document.getElementById("helpOverlay").classList.remove("open");
+}
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") closeHelp();
+});
 
 function toast(text){
   const t = document.getElementById("toast");
@@ -727,7 +822,7 @@ document.getElementById("form").onsubmit = async (ev) => {
   if (Array.isArray(j.replies)){
     j.replies.forEach(rep => appendPersonaBubble(rep));
   } else {
-    appendAssistantBubble({text:j.reply || "(no reply)", evidence:j.evidence});
+    appendAssistantBubble({text:j.reply || "(keine Antwort)", evidence:j.evidence});
   }
 };
 
@@ -772,21 +867,21 @@ function appendEvidenceVeil(container, evidence){
   const details = document.createElement("details");
   details.className = "evidenceVeil";
   const summary = document.createElement("summary");
-  summary.textContent = "sources used";
+  summary.textContent = "Verwendete Quellen";
   details.appendChild(summary);
   const own = document.createElement("div");
-  own.textContent = `own page: ${evidence.own_page || evidence.persona_path || "?"}`;
+  own.textContent = `eigene Seite: ${evidence.own_page || evidence.persona_path || "?"}`;
   details.appendChild(own);
   const consulted = Array.isArray(evidence.consulted_paths) ? evidence.consulted_paths : [];
   const c = document.createElement("div");
-  c.textContent = consulted.length ? `consulted: ${consulted.join(", ")}` : "consulted: none";
+  c.textContent = consulted.length ? `nachgeschlagen: ${consulted.join(", ")}` : "nachgeschlagen: keine";
   details.appendChild(c);
   const semantic = Array.isArray(evidence.semantic_paths) ? evidence.semantic_paths : [];
   const s = document.createElement("div");
-  s.textContent = semantic.length ? `semantic archive: ${semantic.join(", ")}` : "semantic archive: off";
+  s.textContent = semantic.length ? `semantisches Archiv: ${semantic.join(", ")}` : "semantisches Archiv: aus";
   details.appendChild(s);
   const routing = document.createElement("div");
-  routing.textContent = `routing: ${evidence.routing || evidence.mode || "unknown"}`;
+  routing.textContent = `Routing: ${evidence.routing || evidence.mode || "unbekannt"}`;
   details.appendChild(routing);
   container.appendChild(details);
 }
@@ -798,11 +893,11 @@ function appendToolEvent(ev, idx, total){
   const summary = ev.tool_result_summary || {};
   if (summary.error){
     d.classList.add("error");
-    d.textContent = `» ${ev.tool_name} failed: ${summary.error}`;
+    d.textContent = `» ${ev.tool_name} fehlgeschlagen: ${summary.error}`;
   } else {
     const path = (ev.tool_args && ev.tool_args.neighbor_path) || "?";
     const chars = summary.chars || 0;
-    d.innerHTML = `» the medium consults <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} chars)`;
+    d.innerHTML = `» liest <span class="wikilink">[[${escapeHtml(path)}]]</span> (${chars} Zeichen)`;
     // Budget warning fires for events 7..10 ONLY when the entire turn produced
     // at most 10 events. If the soft-cap-rejection event (the 11th) made it
     // into the batch, total is 11 and the warning is suppressed for the whole
@@ -810,7 +905,7 @@ function appendToolEvent(ev, idx, total){
     // tells the story without doubling the visual noise on each preceding event.
     if (idx + 1 >= 7 && total <= 10){
       d.classList.add("budgetWarning");
-      d.innerHTML += ` <span style="opacity:.7">— the veil thins (${idx + 1}/10)</span>`;
+      d.innerHTML += ` <span style="opacity:.7">— Lese-Budget fast erreicht (${idx + 1}/10)</span>`;
     }
   }
   log.appendChild(d);
