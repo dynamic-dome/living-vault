@@ -1,46 +1,27 @@
-# Last Session — living-vault
+# Last Session
 
-*Datum: 2026-05-11*
-*Agent: Claude Opus 4.7 (1M context)*
+*Date: 2026-07-09 10:00*
+*Agent: Claude Code*
 
-## Headline
-
-**Phase-13 Real-Run-Bugfix + Blueprint-PoC gegen kompetenz-wiki + Projekt-Doku-Konvention etabliert.**
-4 Commits gepusht, 2 zusätzliche Speicherorte für die neue User-Konvention (CLAUDE.md + HOW-TO-USE.md in jedem Projekt-Root).
-
-## Was Wurde Gemacht
-
-- **Bugfix Phase 13:** `deploy-public-vault.ps1` `-Vault` Default `$HOME\wiki` → `$HOME\wiki\wiki` (Commit `4ca72c8`)
-- **Blueprint-PoC:** kompetenz-wiki indexiert (193 Pages, 840 Edges), Allowlist generiert, Deploy ohne Code-Change durch
-- **Wiki-Outputs:** `wiki/wiki/todos/2026-05-11-living-vault-kompetenz-wiki-publishing.md` (P3), `wiki/wiki/queries/2026-05-11-session-living-vault-blueprint-poc.md`, log.md + index.md aktualisiert
-- **Wrap-Up Memory + Gitignore:** Commit `1591820` (out-vault-*/, Learnings L1+L2)
-- **HOW-TO-USE.md** als 199-Zeilen-Index/Wegweiser (Commit `8fe90af`)
-- **CLAUDE.md im Root** mit Vorrang-Verweis auf HOW-TO-USE.md (Commit `6095c25`)
-- **Globale Konvention:** Block "Projekt-Eintrittspunkt" in `~/.claude/CLAUDE.md` eingetragen + Memory-Backup `user_project_entrypoint_convention.md`
+## What Was Done
+- Séance-UI komplett auf Deutsch + geführter 3-Schritte-Flow (Suchfeld mit Live-Filter, Häkchen-Liste, Chips, ein Start-Button; Dropdown + Doppelklick entfernt)
+- Starthinweis-Karte im leeren Chat + Hilfe-Overlay („?") als eingebaute Klickanleitung
+- QA-Feinschliff: stummer /api/say-Fehlerpfad sichtbar gemacht, Suchfeld volle Breite, Numerus-Fixes
+- Embeddings: [embeddings]-Extra via uv installiert, Vault 1602 Seiten mit all-MiniLM-L6-v2 indexiert — „KI fragen"/„Gruppen" liefern jetzt Ergebnisse
+- Launcher-Policy: Re-Index mit Embeddings bei Vault-Änderung (LastWriteTime), vor Serverstart (D2)
+- End-to-End-QA im Browser inkl. echtem LLM-Chat (Carry-Over T-1 erledigt); alles gepusht (6a542f2…e382e6d)
 
 ## Open Items
-
-- **193-Pages-3D-Modell im Browser inspizieren** — User hat technisches "Beweis reicht" gewählt und Sichtprüfung vertagt
-- **kompetenz-wiki braucht mehr Git-Commits** damit History-Panel reicher wird (heute nur 1 Initial-Commit)
-- **Variante B (TOML-Profile)** skizziert im Wiki-TODO, nicht implementiert
-- **Audit existierender Projekte:** Andere Projekte (`dome-dynamics`, DCO, Plugins) wurden NICHT auf CLAUDE.md+HOW-TO-USE.md-Pflicht durchgegangen — passiert reaktiv in deren jeweiligen Sessions
+- ~~T-2: 3D-Polish auf galaxy/city/network-Varianten~~ — **VERWORFEN (2026-07-09)**: Synesthesia/3D wird nicht veröffentlicht (vault.dynamic-dome.com löst nicht auf, kein out-vault-Build, kein Zuschauer). Polieren-vor-Publizieren-Antipattern. Falls je gewünscht: erst *ein* Test-Deploy anschauen, dann entscheiden — nicht alle 3 Varianten polieren.
+- T-3: Launcher-Freshness-Check im Alltag beobachten (Re-Index-Dauer ok?) — passiv, kein aktiver Task
+- Séance-Verlauf enthält leere QA-Testsessions (keine Lösch-Funktion in der UI) — Nice-to-have
 
 ## Next Steps
-
-1. Bei nächster Session in einem fremden Projekt: gemäß neuer globaler Regel proaktiv prüfen ob CLAUDE.md + HOW-TO-USE.md im Root existieren, sonst Anlegen vorschlagen
-2. Carry-Over aus 2026-05-10 (Wiki-Export von Insights, Variant-Templates, Belief-Evolution als eigener Master-Plan) bleibt unverändert offen
-3. Falls kompetenz-wiki regelmäßig publiziert werden soll: Wiki-TODO `2026-05-11-living-vault-kompetenz-wiki-publishing.md` als Anker, Variante B (TOML-Profile) implementieren
+Schlussstrich gezogen (2026-07-09). Séance-UI-Arbeit fertig + gepusht. Keine aktiven Tasks mehr.
+Optional bei Bedarf: Codex-Review der Session-Commits.
 
 ## Statistics
-
-- Commits: 4 (`4ca72c8` Phase-13-fix, `1591820` Wrap-up, `8fe90af` HOW-TO-USE, `6095c25` CLAUDE.md — alle gepusht)
-- Tests: 273 grün (unverändert — keine Python-Code-Änderung)
-- Neue Learnings: 3 (L1 deploy-bug, L2 generic-reader, L3 user-konvention)
-- Neue Wiki-TODOs: 1 (P3)
-- Neue Doku-Files: 2 (HOW-TO-USE.md, CLAUDE.md)
-- Globale Regeln neu: 1 (Projekt-Eintrittspunkt-Block in `~/.claude/CLAUDE.md`)
+- Iterations: 3 | Errors: 2 | New Patterns: 0 (Guard: zu wenig Daten)
 
 ## Active Warnings
-
-- Phase-close-Tests fangen Config-Default-Bugs nicht (Lesson L1) — bei zukünftigen Phasen Real-Run-Sichtprüfung VOR `CLOSED` markieren
-- Ab nächster Session: CLAUDE.md+HOW-TO-USE.md-Check in JEDEM Projekt (globale Regel)
+- .vault-engine.db ohne WAL: nie `living-vault index` parallel zum laufenden Séance-Server (D2)

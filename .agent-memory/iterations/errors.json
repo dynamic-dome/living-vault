@@ -1,1 +1,49 @@
-[]
+[
+  {
+    "id": "E1",
+    "date": "2026-07-09",
+    "iteration": 6,
+    "category": "logic",
+    "tags": [
+      "ui",
+      "error-handling",
+      "fetch",
+      "seance"
+    ],
+    "trigger": "In-Browser-QA: Frage gesendet gegen Server ohne ANTHROPIC_API_KEY → HTTP 500",
+    "problem": "Say-Handler parste Response ohne !r.ok-Check; bei Serverfehler sah der User nichts (JSON-Parse-Error nur in Konsole)",
+    "root_cause": "Fehlendes Error-Handling im Original-Code des fetch-Handlers (/api/say) — alle anderen Handler hatten Toast-Fehlerpfade, dieser nicht",
+    "fix": "if (!r.ok){ toast('Antwort fehlgeschlagen (HTTP N)…'); return; } vor r.json()",
+    "prevention": "Bei fetch-Handlern systematisch prüfen, dass JEDER einen !r.ok-Pfad hat; QA immer einen echten Fehlerfall provozieren",
+    "severity": "major",
+    "attempts": 1,
+    "confidence": 5,
+    "occurrences": 1,
+    "recurrence_dates": [],
+    "last_seen": "2026-07-09"
+  },
+  {
+    "id": "E2",
+    "date": "2026-07-09",
+    "iteration": 7,
+    "category": "config",
+    "tags": [
+      "python",
+      "uv",
+      "pip",
+      "missing-dependency",
+      "venv"
+    ],
+    "trigger": "python -m pip install -e .[embeddings] im Projekt-venv",
+    "problem": "No module named pip — venv hat kein pip",
+    "root_cause": "venv wurde mit uv erstellt; uv-venvs enthalten standardmäßig kein pip",
+    "fix": "uv pip install -e .[embeddings] --python .venv/Scripts/python.exe",
+    "prevention": "In diesem Repo (und uv-Projekten generell) Installationen via uv pip … --python <venv-python> statt python -m pip",
+    "severity": "minor",
+    "attempts": 2,
+    "confidence": 5,
+    "occurrences": 1,
+    "recurrence_dates": [],
+    "last_seen": "2026-07-09"
+  }
+]

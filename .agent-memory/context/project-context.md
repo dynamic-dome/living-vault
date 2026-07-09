@@ -1,6 +1,6 @@
 # Project Context
 
-*Last refreshed: 2026-05-09 (patch-init via /agentic-os:init)*
+*Last refreshed: 2026-07-09 (wrap-up decision-scan)*
 
 ## Project
 - **Name:** living-vault
@@ -59,3 +59,8 @@
 
 ## Commit-message convention
 `living-vault | Phase-{N}: {short-status}` — `git log --grep="living-vault"` is the cross-session handoff index.
+
+## Constraints (runtime)
+- `.vault-engine.db`: journal_mode=delete (kein WAL) — kein `living-vault index` parallel zum laufenden Séance-Server (D2).
+- Séance-UI-Texte: deutsch + funktional, Mystik nur visuell (D1).
+- venv ist uv-basiert (kein pip) — Installationen via `uv pip install ... --python .venv/Scripts/python.exe`.

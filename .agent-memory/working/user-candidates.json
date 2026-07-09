@@ -1,0 +1,47 @@
+[
+  {
+    "id": "UC1",
+    "key": "ui-deutsch-selbsterklaerend",
+    "observation": "UIs sollen deutsch beschriftet, selbsterklärend/ergonomisch sein und eine kleine Klickanleitung enthalten (explizit verlangt, Séance-UI 2026-07-09)",
+    "status": "promoted",
+    "signal_type": "preference",
+    "confidence": 0.9,
+    "occurrences": 1,
+    "evidence": [
+      "session 2026-07-09: 'bitte zunächst einmal alle Knöpfe/Buttons auf Deutsch … übersichtlich, ergonomisch … kleine Klickanleitung'"
+    ],
+    "first_seen": "2026-07-09",
+    "last_seen": "2026-07-09",
+    "trust_source": "conversation"
+  },
+  {
+    "id": "UC2",
+    "key": "diktat-eingabe-namen-verifizieren",
+    "observation": "User diktiert Nachrichten — Eigennamen können von der Spracherkennung verstümmelt sein ('ZMOS' = Séance-UI); vor Arbeit an benannten Artefakten Ziel verifizieren",
+    "status": "observed",
+    "signal_type": "workflow",
+    "confidence": 0.6,
+    "occurrences": 1,
+    "evidence": [
+      "session 2026-07-09: 'ZMOS' existierte nirgends, gemeint war Séance-UI"
+    ],
+    "first_seen": "2026-07-09",
+    "last_seen": "2026-07-09",
+    "trust_source": "conversation"
+  },
+  {
+    "id": "UC3",
+    "key": "minimale-loesungen-kein-overhead",
+    "observation": "Bei Zusatzfunktionen explizit 'nicht zu viel Overhead' — bevorzugt kleinste sinnvolle Lösung statt Feature-Ausbau",
+    "status": "observed",
+    "signal_type": "preference",
+    "confidence": 0.5,
+    "occurrences": 1,
+    "evidence": [
+      "session 2026-07-09: Embeddings-Nachtrag"
+    ],
+    "first_seen": "2026-07-09",
+    "last_seen": "2026-07-09",
+    "trust_source": "conversation"
+  }
+]

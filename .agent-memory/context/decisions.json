@@ -1,1 +1,97 @@
-[]
+[
+  {
+    "id": "D1",
+    "date": "2026-07-09",
+    "type": "architecture-decision",
+    "title": "Séance-UI-Sprachpolitik: deutsch + funktional, Mystik nur als Flavor",
+    "status": "active",
+    "context": "User fand die UI unverständlich; Ursache waren nicht nur englische Texte, sondern metaphorisch verschleierte Begriffe (spirits/summon/seal record).",
+    "options_considered": [
+      {
+        "option": "Mystik komplett, nur übersetzt",
+        "pros": [
+          "stimmungsvoll"
+        ],
+        "cons": [
+          "Geister beschwören bleibt erklärungsbedürftig"
+        ]
+      },
+      {
+        "option": "Funktional mit Mystik-Flavor (gewählt)",
+        "pros": [
+          "maximal verständlich",
+          "Charakter bleibt (Optik, Brandmark)"
+        ],
+        "cons": [
+          "weniger immersiv"
+        ]
+      },
+      {
+        "option": "Komplett nüchtern",
+        "pros": [
+          "maximale Klarheit"
+        ],
+        "cons": [
+          "Identität der App verloren"
+        ]
+      }
+    ],
+    "decision": "Alle sichtbaren UI-Texte deutsch und funktional (Seiten wählen / Gespräch starten / Exportieren); Séance-Ästhetik bleibt rein visuell. Vom User per AskUserQuestion explizit gewählt.",
+    "consequences": "Künftige Séance-UI-Texte folgen dieser Politik; Metaphern nur noch in Optik/Untertiteln.",
+    "supersedes": null,
+    "tags": [
+      "ui",
+      "i18n",
+      "seance",
+      "ux"
+    ]
+  },
+  {
+    "id": "D2",
+    "date": "2026-07-09",
+    "type": "architecture-decision",
+    "title": "Séance-Launcher-Index-Policy: Freshness-Check, mit Embeddings, vor Serverstart",
+    "status": "active",
+    "context": "Launcher indexierte nur bei leerer DB und mit --no-embed; 'KI fragen'/'Gruppen' brauchen Embeddings, neue Wiki-Seiten erschienen nie. No-Op-Re-Index kostet ~14s (get_backend()-Modell-Load vor Kandidatensuche). .vault-engine.db läuft mit journal_mode=delete (kein WAL).",
+    "options_considered": [
+      {
+        "option": "Immer indexieren",
+        "pros": [
+          "immer frisch"
+        ],
+        "cons": [
+          "+14s bei jedem Start auch ohne Änderung"
+        ]
+      },
+      {
+        "option": "Hintergrund-Index parallel zum Server",
+        "pros": [
+          "UI sofort da"
+        ],
+        "cons": [
+          "database-is-locked-Risiko (journal_mode=delete)"
+        ]
+      },
+      {
+        "option": "Freshness-Check via LastWriteTime (gewählt)",
+        "pros": [
+          "schneller Start bei unverändertem Vault",
+          "frisch nach Änderungen"
+        ],
+        "cons": [
+          "~1-2s Verzeichnis-Scan pro Start"
+        ]
+      }
+    ],
+    "decision": "start-seance-ui.ps1 re-indexiert (mit Embeddings) wenn DB leer ODER jüngste .md-Datei neuer als DB; Index läuft immer synchron VOR dem Serverstart; --no-embed abgeschafft.",
+    "consequences": "Embeddings bleiben dauerhaft konsistent; kein Parallel-Index neben laufendem Server erlaubt, solange kein WAL-Modus aktiv ist.",
+    "supersedes": null,
+    "tags": [
+      "seance",
+      "embeddings",
+      "sqlite",
+      "launcher",
+      "concurrency"
+    ]
+  }
+]

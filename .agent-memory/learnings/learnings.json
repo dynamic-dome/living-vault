@@ -4,8 +4,14 @@
     "date": "2026-05-11",
     "text": "Phase-13 deploy-public-vault.ps1 hatte -Vault Default auf $HOME\\wiki, aber pages.path in .vault-engine.db ist relativ zu $HOME\\wiki\\wiki gespeichert. Folge: vault_root\\relpath zeigte eine Ebene zu hoch, git log fand keine Commits, history.json war im Live-Vault leer. Tests sind alle gruen gewesen, weil sie mit Fixture-Repos arbeiten und vault_root explizit setzen. Real-Run-Sichtpruefung hat den Bug aufgedeckt — Lesson: phase-close-tests fangen Konfigurationsdefault-Bugs nicht.",
     "importance": 4,
-    "tags": ["living-vault", "phase-13", "deploy", "config-default", "real-run-required"],
-    "layer": "short-term",
+    "tags": [
+      "living-vault",
+      "phase-13",
+      "deploy",
+      "config-default",
+      "real-run-required"
+    ],
+    "layer": "archive-candidate",
     "superseded_by": null,
     "last_relevant": "2026-05-11"
   },
@@ -14,8 +20,14 @@
     "date": "2026-05-11",
     "text": "Living-Vault ist bereits ein generischer Vault-Reader, nicht an ~/wiki gebunden. CLI-Schnittstellen (vault-engine-mcp index --vault/--db, deploy-public-vault.ps1 -Vault/-Db/-Allowlist/-OutDir) akzeptieren beliebige Pfade. PoC am 2026-05-11 gegen kompetenz-wiki: 193 Pages, 840 Edges, 0 Errors, 0 Skipped, kein Code-Change. Bonus: vault-engine-mcp parsed nicht nur [[…]]-Wikilinks sondern auch Frontmatter-Felder supports/depends_on/applies_to als Edge-Quellen — kompetenz-wiki hat dadurch 4.35 Edges/Page Density (sehr graph-freundlich).",
     "importance": 3,
-    "tags": ["living-vault", "multi-vault", "blueprint", "vault-engine-mcp", "edges"],
-    "layer": "short-term",
+    "tags": [
+      "living-vault",
+      "multi-vault",
+      "blueprint",
+      "vault-engine-mcp",
+      "edges"
+    ],
+    "layer": "archive-candidate",
     "superseded_by": null,
     "last_relevant": "2026-05-11"
   },
@@ -24,9 +36,124 @@
     "date": "2026-05-11",
     "text": "User-Konvention 2026-05-11: jedes Projekt MUSS im Root CLAUDE.md (Agent-Konventionen, max ~40 Zeilen, verweist auf HOW-TO-USE.md) und HOW-TO-USE.md (Index/Wegweiser fuer User und Agent, verlinkt docs/*.md statt zu duplizieren). README bleibt minimal. Globale Regel in ~/.claude/CLAUDE.md Block 'Projekt-Eintrittspunkt' eingetragen + Memory-Backup mit User-Originaltext gepinnt. Referenz-Implementierung: living-vault Commits 6095c25 (CLAUDE.md) + 8fe90af (HOW-TO-USE.md). Bei Session-Start in fremden Projekten ohne diese Dateien: proaktiv fragen ob anlegen.",
     "importance": 5,
-    "tags": ["user-konvention", "projekt-doku", "claude-md", "how-to-use", "session-start"],
-    "layer": "short-term",
+    "tags": [
+      "user-konvention",
+      "projekt-doku",
+      "claude-md",
+      "how-to-use",
+      "session-start"
+    ],
+    "layer": "archive-candidate",
     "superseded_by": null,
     "last_relevant": "2026-05-11"
+  },
+  {
+    "id": "L4",
+    "date": "2026-06-29",
+    "text": "Template-/Test-Kopplung in synesthesia: vault-3d.html.j2 ist die Default- UND Public-Variante (vault.dynamic-dome.com). 13 Render-Tests (tests/test_synesthesia_render.py) asserten auf Jinja-Hooks im gerenderten HTML: id=\"history\", _loadHistory, 'History (last 10 commits)', 'vault.dynamic-dome.com', 'öffentliche Pages aus', 'schema v1', renderer.domElement, plus Determinismus (zwei Builds byte-gleich exkl. build-stamp-Zeilen). Bei jedem Template-Edit diese Hooks + Jinja-{% if %}-Bloecke erhalten, sonst brechen Tests. Gegenstueck: seance_ui/static/index.html wird von KEINEM Test referenziert — Copy/Style dort frei aenderbar.",
+    "importance": 4,
+    "tags": [
+      "living-vault",
+      "synesthesia",
+      "jinja",
+      "tests",
+      "template-coupling",
+      "seance"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-06-29"
+  },
+  {
+    "id": "L5",
+    "date": "2026-06-29",
+    "text": "Three.js-Bloom-Tuning + Pflicht-Browser-QA (CLAUDE.md §4): UnrealBloom-strength muss gegen die realen Node-Groessen kalibriert werden — zu stark (0.9/threshold 0.18) brennt grosse emissive Nodes zu reinweissen Blobs aus und loescht Cluster-Farbe + Kern; 0.7/threshold 0.26 mit emissiveIntensity 0.68 haelt Glow UND Farbe/Kern. Verifikation: Playwright-MCP blockt file:// → lokalen http.server (127.0.0.1, §16) nutzen; Hover-Highlight via dispatched MouseEvent('mousemove') verifizieren statt nur statischem Shot (Canvas-Runtime-QA, p5-quadraticVertex-Lektion). Tick-Loop ohne Console-Fehler ueber viele Frames = render-loop gesund.",
+    "importance": 3,
+    "tags": [
+      "three.js",
+      "bloom",
+      "webgl",
+      "browser-qa",
+      "playwright",
+      "canvas-runtime"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-06-29"
+  },
+  {
+    "id": "L6",
+    "date": "2026-07-09",
+    "text": "Metaphern-lastige UIs: Übersetzung allein löst Verständnisprobleme nicht — wenn Begriffe metaphorisch verschleiert sind (spirits/summon/seal), ist auch die deutsche Fassung unverständlich. Erst Funktionsbegriffe, Flavor nur als Deko (Séance-UI-Umbau 2026-07-09).",
+    "importance": 3,
+    "tags": [
+      "ui",
+      "i18n",
+      "ux",
+      "seance"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
+  },
+  {
+    "id": "L7",
+    "date": "2026-07-09",
+    "text": "fetch-Handler brauchen systematisch einen !r.ok-Pfad: der Séance-Say-Handler schluckte HTTP 500 komplett stumm (JSON-Parse-Error nur in Konsole). QA muss mindestens einen echten Fehlerfall provozieren (z. B. Server ohne API-Key).",
+    "importance": 3,
+    "tags": [
+      "ui",
+      "error-handling",
+      "fetch",
+      "qa"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
+  },
+  {
+    "id": "L8",
+    "date": "2026-07-09",
+    "text": "Dieses Repo-venv wurde mit uv erstellt und hat KEIN pip — Installationen via `uv pip install -e .[extra] --python .venv/Scripts/python.exe`, nicht `python -m pip`.",
+    "importance": 2,
+    "tags": [
+      "python",
+      "uv",
+      "pip",
+      "venv"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
+  },
+  {
+    "id": "L9",
+    "date": "2026-07-09",
+    "text": "living_vault index_embeddings ruft get_backend() (= Sentence-Transformers-Modell-Load, ~14s) VOR der Kandidatensuche auf — auch ein No-Op-Re-Index kostet die volle Ladezeit. Launcher nutzt deshalb LastWriteTime-Freshness-Check statt 'immer indexieren'.",
+    "importance": 3,
+    "tags": [
+      "embeddings",
+      "sentence-transformers",
+      "performance",
+      "seance"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
+  },
+  {
+    "id": "L10",
+    "date": "2026-07-09",
+    "text": ".vault-engine.db läuft mit journal_mode=delete (kein WAL): niemals `living-vault index` parallel zum laufenden Séance-Server — 'database is locked'-Risiko. Launcher indexiert deshalb VOR dem Serverstart.",
+    "importance": 4,
+    "tags": [
+      "sqlite",
+      "journal-mode",
+      "concurrency",
+      "seance"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
   }
 ]

@@ -1,0 +1,10 @@
+[
+  {
+    "ts": "2026-07-09T09:45:00",
+    "field": "Preferences",
+    "old_value": "(Will be populated through observed patterns)",
+    "new_value": "UIs deutsch, selbsterklärend, mit Klickanleitung",
+    "candidate_id": "UC1",
+    "evidence": "session 2026-07-09 (Séance-UI-Anliegen, wörtliche Anforderung)"
+  }
+]

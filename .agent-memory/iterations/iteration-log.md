@@ -121,3 +121,57 @@ User-Sichtprüfung 2026-05-09 in 4 Stages durchlaufen: (1) frontmatter-only buil
 ### Errors
 
 (keine echten Bugs in finaler Code-Base — der PCA-Pad-Fix war eine Edge-Case-Vorsorge ohne production-Auswirkung, der Codex-Verifier-LOW-Befund SQLite-IN-Limit ist theoretisch ohne praktischen Trigger, alle Quality-Items im Cross-Review-Loop adressiert)
+
+## Iteration #5 — 2026-07-09 09:00
+
+**Type:** feature
+**Summary:** Séance-UI komplett auf Deutsch umgestellt und in geführten 3-Schritte-Flow umgebaut (Spec + Plan + Implementierung, Commits 6a542f2/5482351/49d8b7f)
+**Files changed:** living_vault/apps/seance_ui/static/index.html, docs/superpowers/specs/2026-07-09-seance-ui-german-ergonomics-design.md, docs/superpowers/plans/2026-07-09-seance-ui-german-ergonomics.md
+**Tests:** passed (351 pytest grün, Backend unberührt; zusätzlich Playwright-In-Browser-QA aller Kernflows)
+**Confidence:** 5/5
+**Tags:** ui, vanilla-js, seance, i18n, ergonomics, single-file-app, brainstorming, playwright-qa
+
+### Details
+- User-Anliegen: UI nicht selbsterklärend ("ZMOS" = Diktat-Verschreiber für Séance-UI). Doppelte Ursache: englische UND metaphorisch verschleierte Begriffe (spirits/summon/seal record) plus verwirrender Ablauf (3 parallele Auswahlwege, versteckte Modus-Zeile, Klick vs. Doppelklick).
+- Entscheidung per AskUserQuestion: funktionale deutsche Begriffe mit Mystik-Flavor (Optik bleibt), Hilfe-Button + Starthinweis-Karte, geführter 3-Schritte-Flow.
+- Umbau: ein Suchfeld (Live-Filter + "KI fragen" + "Gruppen"), Häkchen-Liste, Chips mit ×, Modus immer sichtbar mit Erklärtext pro Modus, ein einziger Start-Button (verzweigt intern auf Einzel-/Roundtable-API). Dropdown und Doppelklick-Sonderweg ersatzlos entfernt. Backend-API byte-identisch unberührt.
+
+### Learnings
+- Bei "alles auf Deutsch übersetzen"-Anliegen prüfen, ob die Begriffe auch übersetzt unverständlich blieben — hier waren die Metaphern das eigentliche Problem, nicht die Sprache.
+
+## Iteration #6 — 2026-07-09 09:10
+
+**Type:** bugfix
+**Summary:** QA-Feinschliff nach In-Browser-Prüfung: stummer /api/say-Fehler sichtbar gemacht, Suchfeld volle Breite, Numerus-Fixes, Modus 'single' übersetzt (Commit bc159c8)
+**Files changed:** living_vault/apps/seance_ui/static/index.html
+**Tests:** passed (Playwright-Re-Check)
+**Confidence:** 5/5
+**Tags:** ui, seance, error-handling, qa-followup, vanilla-js
+
+### Details
+- In-Browser-QA deckte auf: der Frage-Handler hatte nie !r.ok-Handling — bei HTTP 500 sah der User nichts (nur Konsole). Fehler-Toast ergänzt.
+- Kleinfixes: Suchfeld-Placeholder war abgeschnitten (Feld jetzt volle Breite), "1 Fragen/Nachrichten" → korrekter Numerus, Meinungsverlauf-Modus "single" → "Einzelgespräch".
+
+### Learnings
+- In-Browser-QA mit echtem End-to-End-Pfad (inkl. LLM-Call) findet Fehlerpfad-Löcher, die Klick-Durchläufe nicht triggern.
+
+### Errors
+- E1: Stummer Fehlerpfad im Say-Handler (vorgefundener Bug)
+- E2: uv-venv ohne pip beim Embeddings-Install
+
+## Iteration #7 — 2026-07-09 09:30
+
+**Type:** feature
+**Summary:** Embeddings-Stack installiert, Vault (1602 Seiten) mit all-MiniLM-L6-v2 indexiert, Launcher re-indexiert künftig automatisch mit Embeddings bei Vault-Änderung (Commit e382e6d)
+**Files changed:** scripts/start-seance-ui.ps1, HOW-TO-USE.md
+**Tests:** passed (RAG-Endpoints liefern echte Treffer; Freshness-Logik real gegen Produktionspfade geprüft)
+**Confidence:** 4/5
+**Tags:** seance, embeddings, sentence-transformers, sqlite, powershell, launcher, config
+
+### Details
+- "KI fragen"/"Gruppen" lieferten leere Ergebnisse: DB war mit --no-embed indexiert. Fix: [embeddings]-Extra via uv installiert, voller Index-Lauf.
+- Launcher-Lücke geschlossen: indexierte nur bei leerer DB und dann ohne Embeddings → Embeddings wären bei Neuaufbau verschwunden, neue Seiten erschienen nie. Jetzt: Re-Index (mit Embeddings) wenn DB leer ODER Vault jünger als DB (LastWriteTime). Overhead gemessen: 14s bei unverändertem Vault (Modell-Load), Freshness-Check ~1-2s.
+- Kein Parallel-Index während Server läuft: journal_mode=delete (kein WAL) → Lock-Risiko.
+
+### Learnings
+- index_embeddings lädt das ST-Modell VOR der Kandidatensuche (get_backend() zuerst) — auch ein No-Op-Re-Index kostet ~14s Modell-Load. Für Launcher-Freshness deshalb Zeitstempel-Vergleich statt "einfach immer indexieren".

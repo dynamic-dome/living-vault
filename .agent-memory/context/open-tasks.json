@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": "T-1",
+    "title": "Séance live gegen FastAPI-Backend QA'en (Chat-Flow, nicht nur visuelle Shell)",
+    "status": "done",
+    "created": "2026-06-29",
+    "updated": "2026-07-09",
+    "source": "wrap-up",
+    "cross_project": false
+  },
+  {
+    "id": "T-2",
+    "title": "3D-Polish (Bloom/Fog/Hover) auf galaxy/city/network-Varianten übertragen",
+    "status": "open",
+    "created": "2026-06-29",
+    "updated": "2026-06-29",
+    "source": "wrap-up",
+    "cross_project": false
+  },
+  {
+    "id": "T-3",
+    "title": "Séance-Launcher-Freshness-Check im Alltag beobachten (Re-Index-Dauer nach Wiki-Änderungen ok?)",
+    "status": "open",
+    "created": "2026-07-09",
+    "updated": "2026-07-09",
+    "source": "wrap-up",
+    "cross_project": false
+  }
+]
