@@ -64,3 +64,4 @@
 - `.vault-engine.db`: journal_mode=delete (kein WAL) — kein `living-vault index` parallel zum laufenden Séance-Server (D2).
 - Séance-UI-Texte: deutsch + funktional, Mystik nur visuell (D1).
 - venv ist uv-basiert (kein pip) — Installationen via `uv pip install ... --python .venv/Scripts/python.exe`.
+- Synesthesia/3D wird vorerst NICHT veröffentlicht; T-2 (3D-Polish) verworfen (D3, 2026-07-09). Reaktivierung nur mit vorherigem Test-Deploy + Ground-Truth-Check. Séance ist der real genutzte Konsument.

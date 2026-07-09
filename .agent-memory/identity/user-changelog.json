@@ -6,5 +6,13 @@
     "new_value": "UIs deutsch, selbsterklärend, mit Klickanleitung",
     "candidate_id": "UC1",
     "evidence": "session 2026-07-09 (Séance-UI-Anliegen, wörtliche Anforderung)"
+  },
+  {
+    "ts": "2026-07-09T11:05:00",
+    "field": "Work Style",
+    "old_value": "(Will be populated through session observations)",
+    "new_value": "Pragmatisch/anti-Gold-Plating: kleinste sinnvolle Lösung, kein Aufwand ohne echten Nutzen/Zuschauer; zieht lieber einen Schlussstrich als zu polieren",
+    "candidate_id": "UC3",
+    "evidence": "session 2026-07-09: 2× bestätigt (Embeddings 'nicht zu viel Overhead' + T-2/3D-Polish verworfen 'gut ist')"
   }
 ]

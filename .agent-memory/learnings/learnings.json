@@ -155,5 +155,21 @@
     "layer": "short-term",
     "superseded_by": null,
     "last_relevant": "2026-07-09"
+  },
+  {
+    "id": "L11",
+    "date": "2026-07-09",
+    "text": "Vor Polish-/Ausbau-Aufwand an einer Ausgabe-Variante per Ground-Truth (curl gegen Zieldomain / out-Build-Check) pruefen, ob sie ueberhaupt deployed/erreichbar ist. Séance-Session: vault.dynamic-dome.com loest nicht auf + kein out-vault-Build → 3D-Polish (T-2) war Polieren-vor-Publizieren an nie veroeffentlichten Varianten, verworfen.",
+    "importance": 3,
+    "tags": [
+      "scope-decision",
+      "ground-truth",
+      "sparring",
+      "synesthesia",
+      "anti-pattern"
+    ],
+    "layer": "short-term",
+    "superseded_by": null,
+    "last_relevant": "2026-07-09"
   }
 ]

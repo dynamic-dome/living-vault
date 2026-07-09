@@ -175,3 +175,20 @@ User-Sichtprüfung 2026-05-09 in 4 Stages durchlaufen: (1) frontmatter-only buil
 
 ### Learnings
 - index_embeddings lädt das ST-Modell VOR der Kandidatensuche (get_backend() zuerst) — auch ein No-Op-Re-Index kostet ~14s Modell-Load. Für Launcher-Freshness deshalb Zeitstempel-Vergleich statt "einfach immer indexieren".
+
+## Iteration #8 — 2026-07-09 11:00
+
+**Type:** config
+**Summary:** Schlussstrich Séance-Session — 3D-Polish (T-2) nach Ground-Truth-Check verworfen, QA-Artefakte via .gitignore ausgeschlossen, AGENTS.md ins Repo (Commit 94da5c3)
+**Files changed:** .gitignore, AGENTS.md, .agent-memory/session-summary.md
+**Tests:** not applicable (Doku/Config)
+**Confidence:** 5/5
+**Tags:** seance, scope-decision, gitignore, sparring, ground-truth, docs
+
+### Details
+- Sparring-Frage des Users „bringt der 3D-Polish überhaupt was": per Ground-Truth geprüft — vault.dynamic-dome.com löst nicht auf (curl exit 6), kein out-vault-Build lokal. Synesthesia/3D ist nirgends deployed, hat keinen Zuschauer.
+- Entscheidung: T-2 (Polish galaxy/city/network) verworfen als Polieren-vor-Publizieren-Antipattern. In session-summary dokumentiert inkl. Begründung, damit die Frage nicht wiederkehrt.
+- Repo-Hygiene: .playwright-mcp/ + seance-*.png (QA-Wegwerf) via .gitignore raus; AGENTS.md (war untracked) aufgenommen.
+
+### Learnings
+- Vor Polish-Aufwand an einer Ausgabe-Variante per Ground-Truth prüfen, ob sie überhaupt deployed/erreichbar ist — ein 12s-curl gegen die Zieldomain verhinderte hier unnötigen 3D-Polish an nie veröffentlichten Varianten.

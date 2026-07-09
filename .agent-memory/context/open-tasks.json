@@ -11,9 +11,10 @@
   {
     "id": "T-2",
     "title": "3D-Polish (Bloom/Fog/Hover) auf galaxy/city/network-Varianten übertragen",
-    "status": "open",
+    "status": "done",
+    "resolution": "verworfen (D3, 2026-07-09): Synesthesia/3D nicht deployed/veröffentlicht → Polieren-vor-Publizieren-Antipattern",
     "created": "2026-06-29",
-    "updated": "2026-06-29",
+    "updated": "2026-07-09",
     "source": "wrap-up",
     "cross_project": false
   },

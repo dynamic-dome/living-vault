@@ -32,13 +32,14 @@
   {
     "id": "UC3",
     "key": "minimale-loesungen-kein-overhead",
-    "observation": "Bei Zusatzfunktionen explizit 'nicht zu viel Overhead' — bevorzugt kleinste sinnvolle Lösung statt Feature-Ausbau",
-    "status": "observed",
+    "observation": "Bevorzugt kleinste sinnvolle Lösung statt Feature-Ausbau; will keinen Aufwand in Dinge ohne echten Nutzen/Zuschauer stecken — zieht lieber einen Schlussstrich als zu polieren ('gut ist')",
+    "status": "promoted",
     "signal_type": "preference",
-    "confidence": 0.5,
-    "occurrences": 1,
+    "confidence": 0.8,
+    "occurrences": 2,
     "evidence": [
-      "session 2026-07-09: Embeddings-Nachtrag"
+      "session 2026-07-09: Embeddings-Nachtrag 'nicht zu viel Overhead'",
+      "session 2026-07-09: verwarf 3D-Polish (T-2), weil nirgends deployed — 'Schlussstrich ziehen, pushen und gut ist'"
     ],
     "first_seen": "2026-07-09",
     "last_seen": "2026-07-09",

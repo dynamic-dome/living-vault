@@ -4,5 +4,7 @@
     "E1",
     "E2"
   ],
-  "learnings_draft": []
+  "learnings_draft": [
+    "Vor Polish-/Ausbau-Aufwand an einer Ausgabe-Variante per Ground-Truth (curl/Deploy-Check) prüfen, ob sie überhaupt veröffentlicht/erreichbar ist — verhindert Polieren-vor-Publizieren."
+  ]
 }

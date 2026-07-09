@@ -93,5 +93,45 @@
       "launcher",
       "concurrency"
     ]
+  },
+  {
+    "id": "D3",
+    "date": "2026-07-09",
+    "type": "status-update",
+    "title": "Synesthesia/3D wird vorerst NICHT veröffentlicht — T-2 (3D-Polish) verworfen",
+    "status": "active",
+    "context": "Ground-Truth-Check am 2026-07-09: vault.dynamic-dome.com löst nicht auf (curl exit 6), kein out-vault-Build lokal vorhanden. Synesthesia/3D ist nirgends deployed und hat keinen Zuschauer. Offenes Item T-2 (Polish der galaxy/city/network-Varianten) hätte etwas poliert, das nicht publiziert ist.",
+    "options_considered": [
+      {
+        "option": "T-2 durchführen (alle 3 Varianten polieren)",
+        "pros": [
+          "Varianten sähen besser aus"
+        ],
+        "cons": [
+          "Polieren-vor-Publizieren-Antipattern",
+          "kein Zuschauer, kein Deploy — Nutzen null"
+        ]
+      },
+      {
+        "option": "T-2 verwerfen, 3D vorerst nicht veröffentlichen (gewählt)",
+        "pros": [
+          "keine Zeit in unsichtbare Ausgabe",
+          "Fokus auf real genutzten Séance-Konsumenten"
+        ],
+        "cons": [
+          "3D bleibt ungezeigtes Schaustück"
+        ]
+      }
+    ],
+    "decision": "Synesthesia/3D wird vorerst nicht öffentlich gezeigt; T-2 verworfen. Reaktivierung nur mit Publikations-Entscheidung: ZUERST ein einzelnes Test-Deploy (deploy-public-vault.ps1) anschauen und EINE Variante wählen — nicht alle drei polieren. Séance bleibt der real genutzte Konsument.",
+    "consequences": "T-2 aus open-tasks entfernt/geschlossen. Synesthesia-Code bleibt lauffähig als Reserve. Kein 3D-Polish-Aufwand ohne vorherigen Ground-Truth-/Deploy-Check.",
+    "supersedes": null,
+    "tags": [
+      "synesthesia",
+      "scope-decision",
+      "ground-truth",
+      "publishing",
+      "anti-pattern"
+    ]
   }
 ]
