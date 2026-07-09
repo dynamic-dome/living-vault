@@ -59,8 +59,13 @@ Drei CLI-Tools werden als Entry-Points installiert:
 
 **Wie:**
 ```powershell
-living-vault index --vault "C:\Users\domes\wiki\wiki" --db "C:\Users\domes\wiki\.vault-engine.db" --no-embed
+living-vault index --vault "C:\Users\domes\wiki\wiki" --db "C:\Users\domes\wiki\.vault-engine.db"
 ```
+`--no-embed` ueberspringt die Embedding-Stage (schneller, aber Seance-Features
+"KI fragen"/"Gruppen"/semantisches Archiv liefern dann leere Ergebnisse).
+Der Seance-Launcher (`scripts/start-seance-ui.ps1`) indexiert seit 2026-07-09
+automatisch mit Embeddings, wenn der Vault sich seit dem letzten Index
+geaendert hat.
 
 **Als MCP-Server (fuer Claude Code):** Siehe [`docs/RUN-MCP-SERVER.md`](docs/RUN-MCP-SERVER.md). Bietet 9 Tools (Search, Backlinks, Page-Read, History, etc.).
 
@@ -183,6 +188,7 @@ PoC-Belege siehe [[wiki/queries/2026-05-11-session-living-vault-blueprint-poc]] 
 - **`history.json` ist leer im Live-Vault** → `vault_root\relpath` zeigt eine Ebene zu hoch. Siehe Phase-13-Fix-Commit `4ca72c8` und Learning L1.
 - **Allowlist-Path nicht gefunden** → Pfade muessen **ohne** `wiki/`-Prefix sein, identisch mit `pages.path` in der DB. Quick-Check: `python -c "import sqlite3; print('\n'.join(r[0] for r in sqlite3.connect('.vault-engine.db').execute('SELECT path FROM pages LIMIT 5')))"`.
 - **Séance-UI gibt 500** → Pruefen ob `.vault-engine.db` existiert und `personas`-Tabelle gefuellt ist (`living-vault extract-voice` muss vorher gelaufen sein).
+- **Séance „KI fragen"/„Gruppen" liefern nichts** → DB wurde mit `--no-embed` indexiert. Fix: `living-vault index` ohne das Flag laufen lassen (braucht `pip install -e ".[embeddings]"`). Check: `SELECT COUNT(*) FROM embeddings_blob` muss ~Seitenzahl sein.
 - **MCP-Server haengt** → Encoding-Setup pruefen (Windows-spezifisch, siehe `mcp-server-windows-setup` Skill im globalen `~/.claude/`).
 
 ---

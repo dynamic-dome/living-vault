@@ -72,9 +72,26 @@ Ensure-Command -Path $VaultRoot -Label "Vault root"
 $env:LIVING_VAULT_ROOT = $VaultRoot
 $env:LIVING_VAULT_DB = $VaultDb
 
-if ((Get-IndexedPageCount) -eq 0) {
-    Write-Host "Indexing vault for Seance UI..."
-    & $LivingVault index --vault $VaultRoot --db $VaultDb --no-embed
+function Test-VaultNewerThanDb {
+    if (-not (Test-Path -LiteralPath $VaultDb)) {
+        return $true
+    }
+    $dbTime = (Get-Item -LiteralPath $VaultDb).LastWriteTime
+    $newest = Get-ChildItem -LiteralPath $VaultRoot -Recurse -Filter *.md -File |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($null -eq $newest) {
+        return $false
+    }
+    return ($newest.LastWriteTime -gt $dbTime)
+}
+
+# Re-index (incremental, WITH embeddings) when the DB is empty or the vault
+# changed since the last index. The server must not be running concurrently:
+# journal_mode=delete means a parallel index would risk "database is locked".
+if (((Get-IndexedPageCount) -eq 0) -or (Test-VaultNewerThanDb)) {
+    Write-Host "Indexing vault for Seance UI (with embeddings)..."
+    & $LivingVault index --vault $VaultRoot --db $VaultDb
 }
 
 if (Test-SeanceRunning) {
