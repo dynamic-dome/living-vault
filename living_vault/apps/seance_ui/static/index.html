@@ -71,8 +71,8 @@
     #ragBack{display:block;margin-top:7px;font-family:var(--mono);font-size:10px;color:var(--candle-soft);
       cursor:pointer;letter-spacing:.06em;}
     #ragBack:hover{color:var(--candle);text-decoration:underline;}
-    #ragForm{display:flex;gap:7px;}
-    #ragQuery{min-width:0;flex:1;background:var(--ash);border:1px solid var(--rule);
+    #ragForm{display:flex;flex-wrap:wrap;gap:7px;}
+    #ragQuery{min-width:100%;flex:1;background:var(--ash);border:1px solid var(--rule);
       color:var(--bone);border-radius:4px;padding:8px 9px;font-family:var(--mono);font-size:11px;}
     #ragQuery::placeholder{color:var(--mist);opacity:.75;}
     #ragQuery:focus{outline:none;border-color:var(--candle);
@@ -663,7 +663,7 @@ async function loadSessions(){
   j.forEach(s => {
     const d = document.createElement("div"); d.className="sessionItem";
     const date = (s.started_at || "").substring(0, 16).replace("T", " ");
-    d.innerHTML = `<div class="sName">${s.page_path}</div><div class="sessionMeta">${date} · ${s.message_count} Nachrichten</div>`;
+    d.innerHTML = `<div class="sName">${s.page_path}</div><div class="sessionMeta">${date} · ${s.message_count} ${s.message_count === 1 ? "Nachricht" : "Nachrichten"}</div>`;
     d.onclick = () => loadSessionIntoChat(s.id, s.page_path);
     el.appendChild(d);
   });
@@ -751,8 +751,9 @@ function appendTraceBubble(trace){
   d.className = "msg assistant";
   const lines = [];
   lines.push("Meinungsverlauf");
-  const modeName = (MODE_HINTS[trace.mode] || {}).name || trace.mode;
-  lines.push(`${trace.participants.length} Teilnehmer · ${trace.turn_count} Fragen · ${modeName}`);
+  const modeName = trace.mode === "single" ? "Einzelgespräch" : ((MODE_HINTS[trace.mode] || {}).name || trace.mode);
+  const frageWord = trace.turn_count === 1 ? "Frage" : "Fragen";
+  lines.push(`${trace.participants.length} Teilnehmer · ${trace.turn_count} ${frageWord} · ${modeName}`);
   (trace.persona_arcs || []).forEach(arc => {
     const name = (arc.persona_path || "").split("/").pop().replace(/\.md$/, "");
     lines.push(``);
@@ -814,6 +815,7 @@ document.getElementById("form").onsubmit = async (ev) => {
   txt.value="";
   appendMsg("user", userText);
   const r = await fetch("/api/say",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sid,text:userText})});
+  if (!r.ok){ toast("Antwort fehlgeschlagen (HTTP " + r.status + ") — läuft der Server korrekt?"); return; }
   const j = await r.json();
   if (Array.isArray(j.tool_events)) {
     j.tool_events.forEach((te, idx) => appendToolEvent(te, idx, j.tool_events.length));
